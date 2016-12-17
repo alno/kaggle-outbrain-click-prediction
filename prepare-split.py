@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from util.meta import val_split
+from util.meta import val_split, val_split_time
 
 print "Loading train..."
 
@@ -15,7 +15,7 @@ events = events.loc[events.index.intersection(train.index.unique())]  # Take onl
 print "Splitting events..."
 
 # Select display_ids for val - consists of time-based and sampled parts
-train_is_val = train.index.isin(events[(events['timestamp'] >= 950400000) | (events.index % 6 == 5)].index)
+train_is_val = train.index.isin(events[(events['timestamp'] >= val_split_time) | (events.index % 6 == 5)].index)
 
 del events
 
