@@ -64,9 +64,15 @@ def fit_predict(split, split_name):
 
     print "  Training..."
 
+    if os.path.exists(train_file + '.cache'):
+        os.remove(train_file + '.cache')
+
     os.system("vw --cache --passes 2 -P 5000000 --loss_function logistic -f vw.model %s " % train_file)
 
     print "  Predicting..."
+
+    if os.path.exists(pred_file + '.cache'):
+        os.remove(pred_file + '.cache')
 
     os.system("vw -i vw.model -p vw.preds -P 5000000 -t %s" % pred_file)
 
