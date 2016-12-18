@@ -8,6 +8,7 @@ import argparse
 from scipy.special import expit
 
 from util.meta import full_split, val_split
+from util.data import read_events, read_documents_meta, read_promoted_content
 from util import gen_prediction_name, gen_submission, score_prediction
 
 
@@ -17,10 +18,11 @@ parser.add_argument('--rewrite-cache', action='store_true', help='Drop cache fil
 
 args = parser.parse_args()
 
+print "Loading dictionary data..."
 
-print "Loading additional data..."
-
-    # TODO
+events = read_events()
+documents = read_documents_meta()
+promoted_content = read_promoted_content()
 
 
 def export_data(src_file, dst_file, label=False):
@@ -32,8 +34,12 @@ def export_data(src_file, dst_file, label=False):
     start_time = time.time()
 
     with open(dst_file, 'wb', buffering=256*1024) as f:
-        for df in pd.read_csv(src_file, dtype=np.int32, chunksize=10000):
-            #df = pd.merge(df, )
+        for df in pd.read_csv(src_file, dtype=np.int32, chunksize=2000000):
+            idx = df.index  # Save record order
+
+            df = df.merge(events, left_on='display_id', right_index=True)
+            df = df.merge(promoted_content, left_on='ad_id', right_index=True)
+            df = df.loc[idx]  # Restore correct order
 
             # TODO Join other data
 
@@ -41,6 +47,10 @@ def export_data(src_file, dst_file, label=False):
                 target = df['clicked'].values * 2 - 1
 
             ad_id = df['ad_id'].values
+            ad_document_id = df['ad_document_id'].values
+            document_id = df['document_id'].values
+            platform = df['platform'].values
+            location = df['geo_location'].fillna('').str.split('>')
 
             for i in xrange(df.shape[0]):
                 line = ''
@@ -48,7 +58,8 @@ def export_data(src_file, dst_file, label=False):
                 if label:
                     line += '%f ' % target[i]
 
-                line += '|a ad_%d' % ad_id[i]
+                line += '|a ad_%d l_c_%s p_%d' % (ad_id[i], location[i][0] if len(location[i]) > 0 else 'UNK', platform[i])
+                line += '|d ad_d_%d d_%d' % (ad_document_id[i], document_id[i])
 
                 f.write(line + '\n')
 
@@ -67,7 +78,7 @@ def fit_predict(split, split_name):
     if os.path.exists(train_file + '.cache'):
         os.remove(train_file + '.cache')
 
-    os.system("vw --cache --passes 2 -P 5000000 --loss_function logistic -f vw.model %s " % train_file)
+    os.system("vw --cache --passes 3 -P 5000000 --loss_function logistic -q aa -q dd -f vw.model %s " % train_file)
 
     print "  Predicting..."
 
