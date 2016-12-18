@@ -48,6 +48,8 @@ def export_data(src_file, dst_file, label=False):
 
             ad_id = df['ad_id'].values
             ad_document_id = df['ad_document_id'].values
+            advertiser_id = df['advertiser_id'].values
+            campaign_id = df['campaign_id'].values
             document_id = df['document_id'].values
             platform = df['platform'].values
             location = df['geo_location'].fillna('').str.split('>')
@@ -58,8 +60,12 @@ def export_data(src_file, dst_file, label=False):
                 if label:
                     line += '%f ' % target[i]
 
-                line += '|a ad_%d l_c_%s p_%d' % (ad_id[i], location[i][0] if len(location[i]) > 0 else 'UNK', platform[i])
-                line += '|d ad_d_%d d_%d' % (ad_document_id[i], document_id[i])
+                loc_country = location[i][0] if len(location[i]) > 0 else 'ZZ'
+                loc_state = location[i][1] if len(location[i]) > 1 else 'ZZ'
+
+                line += '|a ad_%d p_%d ac_%d aa_%d' % (ad_id[i], platform[i], campaign_id[i], advertiser_id[i])  # Ad info
+                line += '|l c_%s s_%s' % (loc_country, loc_state)  # Location
+                line += '|d ad_d_%d d_%d' % (ad_document_id[i], document_id[i])  # Documents
 
                 f.write(line + '\n')
 
@@ -78,7 +84,7 @@ def fit_predict(split, split_name):
     if os.path.exists(train_file + '.cache'):
         os.remove(train_file + '.cache')
 
-    os.system("vw --cache --passes 3 -P 5000000 --loss_function logistic -b 20 -q aa -q dd -f vw.model %s " % train_file)
+    os.system("vw --cache --passes 3 -P 5000000 --loss_function logistic -b 20 -q aa -q al -q ld -q dd -f vw.model %s " % train_file)
 
     print "  Predicting..."
 
@@ -92,7 +98,7 @@ def fit_predict(split, split_name):
 
     return pred
 
-##
+## Validation
 
 print "Validation split..."
 
@@ -109,7 +115,9 @@ print "  Total score: %.5f" % score
 
 pred[['display_id', 'ad_id', 'pred']].to_pickle('preds/%s-val.pickle' % name)
 
-##
+del pred
+
+## Prediction
 
 print "Full split..."
 
@@ -119,6 +127,8 @@ pred[['display_id', 'ad_id', 'pred']].to_pickle('preds/%s-test.pickle' % name)
 print "  Generating submission..."
 subm = gen_submission(pred)
 subm.to_csv('subm/%s.csv.gz' % name, index=False, compression='gzip')
+
+del pred, subm
 
 print "  File name: %s" % name
 print "Done."
