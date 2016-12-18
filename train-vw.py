@@ -78,7 +78,7 @@ def fit_predict(split, split_name):
     if os.path.exists(train_file + '.cache'):
         os.remove(train_file + '.cache')
 
-    os.system("vw --cache --passes 3 -P 5000000 --loss_function logistic -q aa -q dd -f vw.model %s " % train_file)
+    os.system("vw --cache --passes 3 -P 5000000 --loss_function logistic -b 20 -q aa -q dd -f vw.model %s " % train_file)
 
     print "  Predicting..."
 
