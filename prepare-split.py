@@ -5,11 +5,11 @@ from util.meta import val_split, val_split_time
 
 print "Loading train..."
 
-train = pd.read_csv("../input/clicks_train.csv.zip", dtype=np.int32, index_col=0)
+train = pd.read_csv("../input/clicks_train.csv.gz", dtype=np.int32, index_col=0)
 
 print "Loading events..."
 
-events = pd.read_csv("../input/events.csv.zip", dtype=np.int32, index_col=0, usecols=[0, 3])  # Load events
+events = pd.read_csv("../input/events.csv.gz", dtype=np.int32, index_col=0, usecols=[0, 3])  # Load events
 events = events.loc[events.index.intersection(train.index.unique())]  # Take only train events
 
 print "Splitting events..."
@@ -21,7 +21,7 @@ del events
 
 print "Saving..."
 
-train[~train_is_val].to_csv(val_split[0], index=True, compression='bz2')
-train[train_is_val].to_csv(val_split[1], index=True, compression='bz2')
+train[~train_is_val].to_csv(val_split[0], index=True, compression='gzip')
+train[train_is_val].to_csv(val_split[1], index=True, compression='gzip')
 
 print "Done."

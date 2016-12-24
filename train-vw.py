@@ -8,7 +8,7 @@ import argparse
 from scipy.special import expit
 
 from util.meta import full_split, val_split
-from util.data import read_events, read_documents_meta, read_promoted_content
+from util.data import read_events, read_documents, read_ads
 from util import gen_prediction_name, gen_submission, score_prediction
 
 
@@ -20,9 +20,14 @@ args = parser.parse_args()
 
 print "Loading dictionary data..."
 
+
+start_time = time.time()
+
 events = read_events()
-documents = read_documents_meta()
-promoted_content = read_promoted_content()
+documents = read_documents()
+promoted_content = read_ads()
+
+print "Loaded in %d seconds" % (time.time() - start_time)
 
 
 def export_data(src_file, dst_file, label=False):
