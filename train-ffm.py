@@ -4,8 +4,6 @@ import pandas as pd
 import os
 import argparse
 
-from scipy.special import expit
-
 from util.meta import full_split, val_split
 from util import gen_prediction_name, gen_submission, score_prediction, print_and_exec
 
@@ -34,7 +32,7 @@ def fit_predict(split, split_name):
     print_and_exec("ffm-predict %s ffm.model ffm.preds" % pred_file)
 
     pred = pd.read_csv(split[1])
-    pred['pred'] = expit(np.loadtxt('ffm.preds'))
+    pred['pred'] = np.loadtxt('ffm.preds')
 
     return pred
 
