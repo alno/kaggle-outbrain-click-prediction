@@ -23,6 +23,7 @@ int main() {
     for (auto it = filesets.begin(); it != filesets.end(); ++ it) {
         auto in_file_name = it->first;
         auto out_file_name = it->second;
+        bool label = out_file_name.find("_train_") != string::npos;
 
         cout << "  Generating " << out_file_name << "... ";
         cout.flush();
@@ -45,6 +46,9 @@ int main() {
             auto event = events[event_id];
 
             stringstream line;
+
+            if (label)
+                line << (stoi(row[2]) * 2 - 1) << " ";
 
             line << "|a ad_" << ad_id << " p_" << event.platform << " ac_" << ad.campaign_id << " aa_" << ad.advertiser_id;
             line << "|l c_" << event.country << " s_" << event.state;
