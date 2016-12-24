@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 
 import datetime
+import os
 
 from .meta import val_split_time
 
@@ -63,3 +64,8 @@ def score_prediction(pred):
     total_score = (present_score_sum + future_score_sum) / (present_score_cnt + future_score_cnt)
 
     return present_score, future_score, total_score
+
+
+def print_and_exec(cmd):
+    print cmd
+    os.system(cmd)
