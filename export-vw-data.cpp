@@ -14,8 +14,8 @@ int main() {
 
     cout << "Loading reference data..." << endl;
 
-    auto events = read_map("cache/events.csv.gz", read_event);
-    auto ads = read_map("../input/promoted_content.csv.gz", read_ad);
+    auto events = read_vector("cache/events.csv.gz", read_event, 23120127);
+    auto ads = read_vector("../input/promoted_content.csv.gz", read_ad, 573099);
     auto documents = read_map("cache/documents.csv.gz", read_document);
 
     cout << "Generating files..." << endl;

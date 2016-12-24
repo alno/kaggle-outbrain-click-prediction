@@ -103,3 +103,43 @@ std::unordered_map<K, T> read_map(const std::string & file_name, std::pair<K, T>
 
     return res;
 }
+
+
+template <typename K, typename T>
+std::vector<T> read_vector(const std::string & file_name, std::pair<K, T> read_entry(const std::vector<std::string> &), size_t size) {
+    using namespace std;
+
+    clock_t begin = clock();
+
+    cout << "  Loading " << boost::typeindex::type_id<T>().pretty_name() << "s... ";
+    cout.flush();
+
+    compressed_csv_file file(file_name);
+    vector<T> res;
+
+    // Resize vector to contain all elements
+    res.resize(size);
+
+    for (int i = 0;; ++i) {
+        vector<string> row = file.getrow();
+
+        if (row.empty())
+            break;
+
+        auto entry = read_entry(row);
+
+        res[entry.first] = move(entry.second);
+
+        if (i > 0 && i % 5000000 == 0) {
+            cout << (i / 1000000) << "M... ";
+            cout.flush();
+        }
+    }
+
+    clock_t end = clock();
+    double elapsed = double(end - begin) / CLOCKS_PER_SEC;
+
+    cout << "done in " << elapsed << " seconds." << endl;
+
+    return res;
+}
