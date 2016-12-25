@@ -22,7 +22,7 @@ def fit_predict(split, split_name):
     if split_name == "val":
         opts += " -p cache/val_test_ffm.txt"
 
-    os.system("ffm-train %s %s ffm.model" % (opts, train_file))
+    print_and_exec("ffm-train %s %s ffm.model" % (opts, train_file))
 
     print "  Predicting..."
 
