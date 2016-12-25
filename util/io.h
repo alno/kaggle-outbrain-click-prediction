@@ -143,3 +143,38 @@ std::vector<T> read_vector(const std::string & file_name, std::pair<K, T> read_e
 
     return res;
 }
+
+
+template <typename K, typename T>
+std::unordered_multimap<K, T> read_multi_map(const std::string & file_name, std::pair<K, T> read_entry(const std::vector<std::string> &)) {
+    using namespace std;
+
+    clock_t begin = clock();
+
+    cout << "  Loading " << boost::typeindex::type_id<T>().pretty_name() << "s... ";
+    cout.flush();
+
+    compressed_csv_file file(file_name);
+    unordered_multimap<K, T> res;
+
+    for (int i = 0;; ++i) {
+        vector<string> row = file.getrow();
+
+        if (row.empty())
+            break;
+
+        res.insert(read_entry(row));
+
+        if (i > 0 && i % 5000000 == 0) {
+            cout << (i / 1000000) << "M... ";
+            cout.flush();
+        }
+    }
+
+    clock_t end = clock();
+    double elapsed = double(end - begin) / CLOCKS_PER_SEC;
+
+    cout << "done in " << elapsed << " seconds." << endl;
+
+    return res;
+}

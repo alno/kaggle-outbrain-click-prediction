@@ -64,3 +64,7 @@ std::pair<int, document> read_document(const std::vector<std::string> & row) {
 
     return std::make_pair(stoi(row[0]), d);
 }
+
+std::pair<int, std::pair<int, float>> read_document_category(const std::vector<std::string> & row) {
+    return std::make_pair(stoi(row[0]), std::make_pair(stoi(row[1]), stof(row[2])));
+}
