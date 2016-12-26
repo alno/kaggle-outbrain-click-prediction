@@ -22,17 +22,17 @@ def fit_predict(split, split_name):
     if split_name == "val":
         opts += " -p cache/val_test_ffm.txt"
 
-    print_and_exec("ffm-train %s %s ffm.model" % (opts, train_file))
+    print_and_exec("ffm-train %s %s /tmp/ffm.model" % (opts, train_file))
 
     print "  Predicting..."
 
     if os.path.exists(pred_file + '.cache'):
         os.remove(pred_file + '.cache')
 
-    print_and_exec("ffm-predict %s ffm.model ffm.preds" % pred_file)
+    print_and_exec("ffm-predict %s /tmp/ffm.model /tmp/ffm.preds" % pred_file)
 
     pred = pd.read_csv(split[1])
-    pred['pred'] = np.loadtxt('ffm.preds')
+    pred['pred'] = np.loadtxt('/tmp/ffm.preds')
 
     return pred
 

@@ -3,7 +3,7 @@ default: bin/export-vw-data bin/export-ffm-data
 bin/%: %.cpp
 	g++ -std=c++14 $< -lboost_iostreams -MMD -o $@
 
--include *.d
+-include bin/*.d
 
 .PHONY: clean
 clean:

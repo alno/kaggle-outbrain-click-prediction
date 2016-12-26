@@ -11,23 +11,6 @@ std::vector<std::pair<std::string, std::string>> filesets = {
     std::make_pair("../input/clicks_test.csv.gz", "cache/full_test_ffm.txt"),
 };
 
-struct reference_data {
-    std::vector<event> events;
-    std::vector<ad> ads;
-    std::unordered_map<int, document> documents;
-    std::unordered_multimap<int, std::pair<int, float>> document_categories;
-};
-
-reference_data load_reference_data() {
-    reference_data res;
-    res.events = read_vector("cache/events.csv.gz", read_event, 23120127);
-    res.ads = read_vector("../input/promoted_content.csv.gz", read_ad, 573099);
-    res.documents = read_map("cache/documents.csv.gz", read_document);
-    res.document_categories = read_multi_map("../input/document_categories.csv.gz", read_document_category);
-
-    return res;
-}
-
 std::hash<std::string> str_hash;
 
 uint32_t hash_base = 1 << 18;
@@ -51,9 +34,13 @@ std::string encode_row(const reference_data & data, int event_id, int ad_id, int
 
     auto ad_doc = data.documents.at(ad.document_id);
     auto ad_doc_categories = data.document_categories.equal_range(ad.document_id);
+    auto ad_doc_topics = data.document_topics.equal_range(ad.document_id);
+    auto ad_doc_entities = data.document_entities.equal_range(ad.document_id);
 
     auto ev_doc = data.documents.at(event.document_id);
     auto ev_doc_categories = data.document_categories.equal_range(event.document_id);
+    auto ev_doc_topics = data.document_topics.equal_range(event.document_id);
+    auto ev_doc_entities = data.document_entities.equal_range(event.document_id);
 
     std::stringstream line;
 
@@ -65,13 +52,25 @@ std::string encode_row(const reference_data & data, int event_id, int ad_id, int
     line << " 6:" << h(event.document_id) << ":1 7:" << h(ev_doc.source_id) << ":1 8:" << h(ev_doc.publisher_id) << ":1";
 
     for (auto it = ev_doc_categories.first; it != ev_doc_categories.second; ++ it)
-        line << " 12:" << it->second.first << ":" << it->second.second;
+        line << " 12:" << h(it->second.first) << ":" << it->second.second;
+
+    for (auto it = ev_doc_topics.first; it != ev_doc_topics.second; ++ it)
+        line << " 14:" << h(it->second.first) << ":" << it->second.second;
+
+    for (auto it = ev_doc_entities.first; it != ev_doc_entities.second; ++ it)
+        line << " 16:" << h(it->second.first) << ":" << it->second.second;
 
     // Promoted document info
     line << " 9:" << h(ad.document_id) << ":1 10:" << h(ad_doc.source_id) << ":1 11:" << h(ad_doc.publisher_id) << ":1";
 
     for (auto it = ad_doc_categories.first; it != ad_doc_categories.second; ++ it)
-        line << " 13:" << it->second.first << ":" << it->second.second;
+        line << " 13:" << h(it->second.first) << ":" << it->second.second;
+
+    for (auto it = ad_doc_topics.first; it != ad_doc_topics.second; ++ it)
+        line << " 15:" << h(it->second.first) << ":" << it->second.second;
+
+    for (auto it = ad_doc_entities.first; it != ad_doc_entities.second; ++ it)
+        line << " 17:" << h(it->second.first) << ":" << it->second.second;
 
     line << std::endl;
 

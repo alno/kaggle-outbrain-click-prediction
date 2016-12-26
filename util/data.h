@@ -4,6 +4,8 @@
 #include <vector>
 #include <stdexcept>
 
+#include "io.h"
+
 struct event {
     int document_id;
     int timestamp;
@@ -24,6 +26,9 @@ struct document {
     int source_id;
     int publisher_id;
 };
+
+
+// Functions to read data types
 
 
 std::pair<int, event> read_event(const std::vector<std::string> & row) {
@@ -65,6 +70,40 @@ std::pair<int, document> read_document(const std::vector<std::string> & row) {
     return std::make_pair(stoi(row[0]), d);
 }
 
-std::pair<int, std::pair<int, float>> read_document_category(const std::vector<std::string> & row) {
+std::pair<int, std::pair<int, float>> read_document_annotation(const std::vector<std::string> & row) {
     return std::make_pair(stoi(row[0]), std::make_pair(stoi(row[1]), stof(row[2])));
+}
+
+
+std::vector<event> read_events() {
+    return read_vector("cache/events.csv.gz", read_event, 23120127);
+}
+
+std::vector<ad> read_ads() {
+    return read_vector("../input/promoted_content.csv.gz", read_ad, 573099);
+}
+
+
+// All data
+
+
+struct reference_data {
+    std::vector<event> events;
+    std::vector<ad> ads;
+    std::unordered_map<int, document> documents;
+    std::unordered_multimap<int, std::pair<int, float>> document_categories;
+    std::unordered_multimap<int, std::pair<int, float>> document_topics;
+    std::unordered_multimap<int, std::pair<int, float>> document_entities;
+};
+
+reference_data load_reference_data() {
+    reference_data res;
+    res.events = read_events();
+    res.ads = read_ads();
+    res.documents = read_map("cache/documents.csv.gz", read_document);
+    res.document_categories = read_multi_map("../input/document_categories.csv.gz", read_document_annotation);
+    res.document_topics = read_multi_map("../input/document_topics.csv.gz", read_document_annotation);
+    res.document_entities = read_multi_map("cache/document_entities.csv.gz", read_document_annotation);
+
+    return res;
 }

@@ -19,17 +19,17 @@ def fit_predict(split, split_name):
     if os.path.exists(train_file + '.cache'):
         os.remove(train_file + '.cache')
 
-    print_and_exec("vw --cache --passes 3 -P 5000000 --loss_function logistic -b 22 -q aa -q al -q ld -q lp -q dp -f vw.model %s " % train_file)
+    print_and_exec("vw --cache --passes 3 -P 5000000 --loss_function logistic -b 22 -q aa -q al -q ld -q lp -q dp -f /tmp/vw.model %s " % train_file)
 
     print "  Predicting..."
 
     if os.path.exists(pred_file + '.cache'):
         os.remove(pred_file + '.cache')
 
-    print_and_exec("vw -i vw.model -p vw.preds -P 5000000 -t %s" % pred_file)
+    print_and_exec("vw -i /tmp/vw.model -p /tmp/vw.preds -P 5000000 -t %s" % pred_file)
 
     pred = pd.read_csv(split[1])
-    pred['pred'] = expit(np.loadtxt('vw.preds'))
+    pred['pred'] = expit(np.loadtxt('/tmp/vw.preds'))
 
     return pred
 
