@@ -55,6 +55,15 @@ std::string encode_row(const reference_data & data, int event_id, int ad_id, int
     for (auto it = ad_doc_entities.first; it != ad_doc_entities.second; ++ it)
         line << " ade_" << it->second.first << ":" << it->second.second;
 
+    // Manual features
+    line << "|f";
+
+    if (ad_doc.publisher_id == ev_doc.publisher_id)
+        line << " sp"; // Same publisher
+
+    if (ad_doc.source_id == ev_doc.source_id)
+        line << " ss"; // Same source
+
     line << std::endl;
 
     return line.str();

@@ -72,6 +72,16 @@ std::string encode_row(const reference_data & data, int event_id, int ad_id, int
     for (auto it = ad_doc_entities.first; it != ad_doc_entities.second; ++ it)
         line << " 17:" << h(it->second.first) << ":" << it->second.second;
 
+    if (ad_doc.publisher_id == ev_doc.publisher_id)
+        line << " 18:1:1"; // Same publisher
+
+    if (ad_doc.source_id == ev_doc.source_id)
+        line << " 19:1:1"; // Same source
+
+    // TODO Category, topic and entity intersection
+    // TODO Weekday, hour
+    // TODO Doc timestamp diff
+
     line << std::endl;
 
     return line.str();
