@@ -4,11 +4,11 @@
 
 #include <functional>
 
-std::vector<std::pair<std::string, std::string>> filesets = {
-    std::make_pair("cache/clicks_val_train.csv.gz", "cache/val_train_ffm.txt"),
-    std::make_pair("cache/clicks_val_test.csv.gz", "cache/val_test_ffm.txt"),
-    std::make_pair("../input/clicks_train.csv.gz", "cache/full_train_ffm.txt"),
-    std::make_pair("../input/clicks_test.csv.gz", "cache/full_test_ffm.txt"),
+std::vector<std::pair<std::vector<std::string>, std::string>> filesets = {
+    { { "cache/clicks_val_train.csv.gz" }, "cache/val_train_ffm.txt" },
+    { { "cache/clicks_val_test.csv.gz" }, "cache/val_test_ffm.txt" },
+    { { "../input/clicks_train.csv.gz" }, "cache/full_train_ffm.txt" },
+    { { "../input/clicks_test.csv.gz" }, "cache/full_test_ffm.txt" },
 };
 
 std::hash<std::string> str_hash;
@@ -28,7 +28,11 @@ uint32_t h(const std::string & a) {
     return str_hash(a) % hash_base;
 }
 
-std::string encode_row(const reference_data & data, int event_id, int ad_id, int label) {
+std::string encode_row(const reference_data & data, const std::vector<std::vector<std::string>> & rows) {
+    int event_id = stoi(rows[0][0]);
+    int ad_id = stoi(rows[0][1]);
+    int label = rows[0].size() == 3 ? stoi(rows[0][2]) : -1;
+
     auto ad = data.ads[ad_id];
     auto event = data.events[event_id];
 

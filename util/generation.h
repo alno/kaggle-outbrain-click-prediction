@@ -3,12 +3,12 @@
 #include "io.h"
 
 template <typename D>
-void generate_files(const D & data, const std::vector<std::pair<std::string, std::string>> & filesets, std::string encode_row_fun(const D &, int, int, int)) {
+void generate_files(const D & data, const std::vector<std::pair<std::vector<std::string>, std::string>> & filesets, std::string encode_row_fun(const D &, const std::vector<std::vector<std::string>> & rows)) {
     using namespace std;
     using namespace boost::iostreams;
 
     for (auto it = filesets.begin(); it != filesets.end(); ++ it) {
-        auto in_file_name = it->first;
+        auto in_file_name = it->first[0];
         auto out_file_name = it->second;
 
         cout << "  Generating " << out_file_name << "... ";
@@ -16,18 +16,23 @@ void generate_files(const D & data, const std::vector<std::pair<std::string, std
 
         clock_t begin = clock();
 
-        compressed_csv_file in(in_file_name);
+        vector<unique_ptr<compressed_csv_file>> in_files;
+
+        for (auto in_it = it->first.begin(); in_it != it->first.end(); ++in_it)
+            in_files.push_back(unique_ptr<compressed_csv_file>(new compressed_csv_file(*in_it)));
+
         ofstream out(out_file_name);
 
-        bool label = in.header.size() == 3;
-
         for (int i = 0;; ++ i) {
-            auto row = in.getrow();
+            vector<vector<string>> rows;
 
-            if (row.empty())
+            for (auto in_it = in_files.begin(); in_it != in_files.end(); ++in_it)
+                rows.push_back((*in_it)->getrow());
+
+            if (rows[0].empty())
                 break;
 
-            out << encode_row_fun(data, stoi(row[0]), stoi(row[1]), label ? stoi(row[2]) : -1);
+            out << encode_row_fun(data, rows);
 
             if (i > 0 && i % 5000000 == 0) {
                 cout << (i / 1000000) << "M... ";
