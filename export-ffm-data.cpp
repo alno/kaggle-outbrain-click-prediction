@@ -5,10 +5,10 @@
 #include <functional>
 
 std::vector<std::pair<std::vector<std::string>, std::string>> filesets = {
-    { { "cache/clicks_val_train.csv.gz" }, "cache/val_train_ffm.txt" },
-    { { "cache/clicks_val_test.csv.gz" }, "cache/val_test_ffm.txt" },
-    { { "../input/clicks_train.csv.gz" }, "cache/full_train_ffm.txt" },
-    { { "../input/clicks_test.csv.gz" }, "cache/full_test_ffm.txt" },
+    { { "cache/clicks_val_train.csv.gz", "cache/leak_val_train.csv.gz" }, "cache/val_train_ffm.txt" },
+    { { "cache/clicks_val_test.csv.gz", "cache/leak_val_test.csv.gz" }, "cache/val_test_ffm.txt" },
+    { { "../input/clicks_train.csv.gz", "cache/leak_full_train.csv.gz" }, "cache/full_train_ffm.txt" },
+    { { "../input/clicks_test.csv.gz", "cache/leak_full_test.csv.gz" }, "cache/full_test_ffm.txt" },
 };
 
 std::hash<std::string> str_hash;
@@ -32,6 +32,11 @@ std::string encode_row(const reference_data & data, const std::vector<std::vecto
     int event_id = stoi(rows[0][0]);
     int ad_id = stoi(rows[0][1]);
     int label = rows[0].size() == 3 ? stoi(rows[0][2]) : -1;
+
+    int leak_viewed = stoi(rows[1][0]);
+    int leak_not_viewed = stoi(rows[1][1]);
+
+    //
 
     auto ad = data.ads[ad_id];
     auto event = data.events[event_id];
@@ -77,10 +82,16 @@ std::string encode_row(const reference_data & data, const std::vector<std::vecto
         line << " 17:" << h(it->second.first) << ":" << it->second.second;
 
     if (ad_doc.publisher_id == ev_doc.publisher_id)
-        line << " 18:1:1"; // Same publisher
+        line << " 18:1001:1"; // Same publisher
 
     if (ad_doc.source_id == ev_doc.source_id)
-        line << " 19:1:1"; // Same source
+        line << " 19:1002:1"; // Same source
+
+    if (leak_viewed > 0)
+        line << " 20:1003:1"; // Same source
+
+    if (leak_not_viewed > 0)
+        line << " 21:1004:1"; // Same source
 
     // TODO Category, topic and entity intersection
     // TODO Weekday, hour

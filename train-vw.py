@@ -9,6 +9,8 @@ from scipy.special import expit
 from util.meta import full_split, val_split
 from util import gen_prediction_name, gen_submission, score_prediction, print_and_exec
 
+vw_options = "--passes 3 -b 22 -q aa -q al -q ld -q lp -q dp -q fa -q fd -q fl -q fp -q ff --nn 10"
+
 
 def fit_predict(split, split_name):
     train_file = 'cache/%s_train_vw.txt' % split_name
@@ -19,7 +21,7 @@ def fit_predict(split, split_name):
     if os.path.exists(train_file + '.cache'):
         os.remove(train_file + '.cache')
 
-    print_and_exec("vw --cache --passes 3 -P 5000000 --loss_function logistic -b 22 -q aa -q al -q ld -q lp -q dp -f /tmp/vw.model %s " % train_file)
+    print_and_exec("vw --cache -P 5000000 --loss_function logistic %s -f /tmp/vw.model %s " % (vw_options, train_file))
 
     print "  Predicting..."
 

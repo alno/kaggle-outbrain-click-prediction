@@ -3,16 +3,21 @@
 #include "util/generation.h"
 
 std::vector<std::pair<std::vector<std::string>, std::string>> filesets = {
-    { { "cache/clicks_val_train.csv.gz" }, "cache/val_train_vw.txt" },
-    { { "cache/clicks_val_test.csv.gz" }, "cache/val_test_vw.txt" },
-    { { "../input/clicks_train.csv.gz" }, "cache/full_train_vw.txt" },
-    { { "../input/clicks_test.csv.gz" }, "cache/full_test_vw.txt" },
+    { { "cache/clicks_val_train.csv.gz", "cache/leak_val_train.csv.gz" }, "cache/val_train_vw.txt" },
+    { { "cache/clicks_val_test.csv.gz", "cache/leak_val_test.csv.gz" }, "cache/val_test_vw.txt" },
+    { { "../input/clicks_train.csv.gz", "cache/leak_full_train.csv.gz" }, "cache/full_train_vw.txt" },
+    { { "../input/clicks_test.csv.gz", "cache/leak_full_test.csv.gz" }, "cache/full_test_vw.txt" },
 };
 
 std::string encode_row(const reference_data & data, const std::vector<std::vector<std::string>> & rows) {
     int event_id = stoi(rows[0][0]);
     int ad_id = stoi(rows[0][1]);
     int label = rows[0].size() == 3 ? stoi(rows[0][2]) : -1;
+
+    int leak_viewed = stoi(rows[1][0]);
+    int leak_not_viewed = stoi(rows[1][1]);
+
+    //
 
     auto ad = data.ads[ad_id];
     auto event = data.events[event_id];
@@ -67,6 +72,13 @@ std::string encode_row(const reference_data & data, const std::vector<std::vecto
 
     if (ad_doc.source_id == ev_doc.source_id)
         line << " ss"; // Same source
+
+    // Leak features
+    if (leak_viewed > 0)
+        line << " v"; // Same source
+
+    if (leak_not_viewed > 0)
+        line << " nv"; // Same source
 
     line << std::endl;
 
