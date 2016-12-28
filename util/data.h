@@ -10,7 +10,9 @@ struct event {
     int document_id;
     int timestamp;
     int platform;
-    std::string uuid;
+    int weekday;
+    int hour;
+    int uid;
     std::string country;
     std::string state;
     std::string region;
@@ -43,10 +45,13 @@ std::pair<int, event> read_event(const std::vector<std::string> & row) {
         e.platform = 0;
     }
 
-    e.uuid = row[1];
     e.country = row[5];
     e.state = row[6];
     e.region = row[7];
+
+    e.hour = stoi(row[8]);
+    e.weekday = stoi(row[9]);
+    e.uid = stoi(row[10]);
 
     return std::make_pair(stoi(row[0]), e);
 }
