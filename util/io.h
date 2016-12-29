@@ -7,8 +7,8 @@
 #include <unordered_map>
 #include <ctime>
 
-#include <boost/iostreams/filtering_streambuf.hpp>
-#include <boost/iostreams/copy.hpp>
+#include <boost/iostreams/device/file.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 
 #include <boost/type_index.hpp>
@@ -32,31 +32,21 @@ std::vector<std::string> split(const std::string &s, char delim) {
 
 class compressed_csv_file {
 public:
-    std::ifstream file;
-    boost::iostreams::filtering_streambuf<boost::iostreams::input> buf;
+    boost::iostreams::filtering_istream in;
     std::vector<std::string> header;
-
-    std::istream * in;
 public:
     compressed_csv_file(const std::string & name) {
-        file = std::ifstream(name, std::ios_base::in | std::ios_base::binary);
-
         std::streamsize buffer_size = 1024*1024;
 
-        buf.push(boost::iostreams::gzip_decompressor(), buffer_size, buffer_size);
-        buf.push(file, buffer_size, buffer_size);
+        in.push(boost::iostreams::gzip_decompressor(), buffer_size, buffer_size);
+        in.push(boost::iostreams::file_source(name, std::ios_base::in | std::ios_base::binary), buffer_size, buffer_size);
 
-        in = new std::istream(&buf);
         header = getrow();
-    }
-
-    ~compressed_csv_file() {
-        delete in;
     }
 
     std::string getline() {
         std::string line;
-        std::getline(*in, line);
+        std::getline(in, line);
         return line;
     }
 
@@ -65,7 +55,7 @@ public:
     }
 
     operator bool() {
-        return !in->eof();
+        return !in.eof();
     }
 };
 
@@ -99,7 +89,7 @@ std::unordered_map<K, T> read_map(const std::string & file_name, std::pair<K, T>
     clock_t end = clock();
     double elapsed = double(end - begin) / CLOCKS_PER_SEC;
 
-    cout << "done in " << elapsed << " seconds." << endl;
+    cout << "done in " << elapsed << " seconds, " << res.size() << " records." << endl;
 
     return res;
 }
@@ -174,7 +164,7 @@ std::unordered_multimap<K, T> read_multi_map(const std::string & file_name, std:
     clock_t end = clock();
     double elapsed = double(end - begin) / CLOCKS_PER_SEC;
 
-    cout << "done in " << elapsed << " seconds." << endl;
+    cout << "done in " << elapsed << " seconds, " << res.size() << " records." << endl;
 
     return res;
 }
