@@ -26,6 +26,7 @@ df = pd.read_csv(os.path.join(input_dir, 'documents_meta.csv.zip'), index_col='d
 df['source_id'] = df['source_id'].fillna(-1).astype(np.int32)
 df['publisher_id'] = df['publisher_id'].fillna(-1).astype(np.int16)
 df['publish_time'] = pd.to_datetime(df['publish_time'].map(fix_date).replace('nan', np.nan), errors='coerce')
+df['publish_timestamp'] = (df['publish_time'].astype(np.int64) // 1000000 - 1465876799998).clip(lower=-1000000000000)
 
 df.to_csv(os.path.join(cache_dir, 'documents.csv.gz'), compression='gzip')
 

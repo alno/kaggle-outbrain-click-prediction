@@ -7,26 +7,27 @@
 #include "io.h"
 
 struct event {
-    int document_id;
-    int timestamp;
-    int platform;
-    int weekday;
-    int hour;
-    int uid;
+    uint32_t document_id;
+    uint32_t uid;
+    int64_t timestamp;
+    uint8_t platform;
+    uint8_t weekday;
+    uint8_t hour;
     std::string country;
     std::string state;
     std::string region;
 };
 
 struct ad {
-    int document_id;
-    int campaign_id;
-    int advertiser_id;
+    uint32_t document_id;
+    uint32_t campaign_id;
+    uint32_t advertiser_id;
 };
 
 struct document {
-    int source_id;
-    int publisher_id;
+    uint32_t source_id;
+    uint32_t publisher_id;
+    int64_t publish_timestamp;
 };
 
 
@@ -37,7 +38,7 @@ std::pair<int, event> read_event(const std::vector<std::string> & row) {
     event e;
 
     e.document_id = stoi(row[2]);
-    e.timestamp = stoi(row[3]);
+    e.timestamp = stoll(row[3]);
 
     try {
         e.platform = stoi(row[4]);
@@ -71,6 +72,7 @@ std::pair<int, document> read_document(const std::vector<std::string> & row) {
 
     d.source_id = stoi(row[1]);
     d.publisher_id = stoi(row[2]);
+    d.publish_timestamp = stoll(row[4]);
 
     return std::make_pair(stoi(row[0]), d);
 }
