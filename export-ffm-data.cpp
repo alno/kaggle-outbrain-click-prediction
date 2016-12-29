@@ -13,20 +13,56 @@ std::vector<std::pair<std::vector<std::string>, std::string>> filesets = {
 
 std::hash<std::string> str_hash;
 
+uint32_t hash_offset = 100;
 uint32_t hash_base = 1 << 18;
 
-uint32_t h(uint32_t a) {
+uint32_t h(uint32_t a, uint32_t f) {
+    a = a + f * 2654435761;
     a = (a ^ 61) ^ (a >> 16);
     a = a + (a << 3);
     a = a ^ (a >> 4);
     a = a * 0x27d4eb2d;
     a = a ^ (a >> 15);
-    return a % hash_base;
+    return (a % hash_base) + hash_offset;
 }
 
-uint32_t h(const std::string & a) {
-    return str_hash(a) % hash_base;
+uint32_t h(const std::string & a, uint32_t f) {
+    return (((str_hash(a) + f) * 2654435761) % hash_base) + hash_offset;
 }
+
+class line_builder {
+public:
+    std::stringstream stream;
+
+    line_builder(int label) {
+        stream << label;
+    }
+
+    void feature(uint32_t field, uint32_t category) {
+        stream << ' ' << field << ':' << h(category, field) << ":1";
+    }
+
+    void feature(uint32_t field, uint32_t category, float value) {
+        stream << ' ' << field << ':' << h(category, field) << ':' << value;
+    }
+
+    void feature(uint32_t field, const std::string & category) {
+        stream << ' ' << field << ':' << h(category, field) << ":1";
+    }
+
+    void feature(uint32_t field, const std::string & category, float value) {
+        stream << ' ' << field << ':' << h(category, field) << ':' << value;
+    }
+
+    void append(const char * str) {
+        stream << str;
+    }
+
+    std::string str() {
+        return stream.str();
+    }
+};
+
 
 std::string encode_row(const reference_data & data, const std::vector<std::vector<std::string>> & rows) {
     int event_id = stoi(rows[0][0]);
@@ -51,54 +87,65 @@ std::string encode_row(const reference_data & data, const std::vector<std::vecto
     auto ev_doc_topics = data.document_topics.equal_range(event.document_id);
     auto ev_doc_entities = data.document_entities.equal_range(event.document_id);
 
-    std::stringstream line;
+    // Start building line
+    line_builder line(label);
 
-    line << label;
-    line << " 0:" << h(ad_id) << ":1 1:" << event.platform << ":1 2:" << h(ad.campaign_id) << ":1 3:" << h(ad.advertiser_id) << ":1";
-    line << " 4:" << h(event.country) << ":1 5:" << h(event.state) << ":1 ";
-    line << " 22:" << event.hour << ":1 23:" << event.weekday << ":1 ";
+    line.feature(0, ad_id);
+    line.feature(1, ad.campaign_id);
+    line.feature(2, ad.advertiser_id);
+
+    line.feature(3, event.platform);
+    line.feature(4, event.country);
+    line.feature(5, event.state);
 
     // Document info
-    line << " 6:" << h(event.document_id) << ":1 7:" << h(ev_doc.source_id) << ":1 8:" << h(ev_doc.publisher_id) << ":1";
+    line.feature(6, event.document_id);
+    line.feature(7, ev_doc.source_id);
+    line.feature(8, ev_doc.publisher_id);
 
     for (auto it = ev_doc_categories.first; it != ev_doc_categories.second; ++ it)
-        line << " 12:" << h(it->second.first) << ":" << it->second.second;
+        line.feature(12, it->second.first, it->second.second);
 
     for (auto it = ev_doc_topics.first; it != ev_doc_topics.second; ++ it)
-        line << " 14:" << h(it->second.first) << ":" << it->second.second;
+        line.feature(14, it->second.first, it->second.second);
 
     for (auto it = ev_doc_entities.first; it != ev_doc_entities.second; ++ it)
-        line << " 16:" << h(it->second.first) << ":" << it->second.second;
+        line.feature(16, it->second.first, it->second.second);
 
     // Promoted document info
-    line << " 9:" << h(ad.document_id ^ 16769023) << ":1 10:" << h(ad_doc.source_id ^ 16769023) << ":1 11:" << h(ad_doc.publisher_id ^ 16769023) << ":1";
+    line.feature(9, ad.document_id);
+    line.feature(10, ad_doc.source_id);
+    line.feature(11, ad_doc.publisher_id);
 
     for (auto it = ad_doc_categories.first; it != ad_doc_categories.second; ++ it)
-        line << " 13:" << h(it->second.first ^ 16769023) << ":" << it->second.second;
+        line.feature(13, it->second.first, it->second.second);
 
     for (auto it = ad_doc_topics.first; it != ad_doc_topics.second; ++ it)
-        line << " 15:" << h(it->second.first ^ 16769023) << ":" << it->second.second;
+        line.feature(15, it->second.first, it->second.second);
 
     for (auto it = ad_doc_entities.first; it != ad_doc_entities.second; ++ it)
-        line << " 17:" << h(it->second.first ^ 16769023) << ":" << it->second.second;
+        line.feature(17, it->second.first, it->second.second);
+
+    //
 
     if (ad_doc.publisher_id == ev_doc.publisher_id)
-        line << " 18:1001:1"; // Same publisher
+        line.append(" 18:1:1"); // Same publisher
 
     if (ad_doc.source_id == ev_doc.source_id)
-        line << " 19:1002:1"; // Same source
+        line.append(" 19:2:1"); // Same source
 
     if (leak_viewed > 0)
-        line << " 20:1003:1"; // Same source
+        line.append(" 20:3:1"); // Same source
 
     if (leak_not_viewed > 0)
-        line << " 21:1004:1"; // Same source
+        line.append(" 21:4:1"); // Same source
+
+    line.stream << " 22:" << (event.weekday + 50) << ":1 23:" << (event.hour + 70) << ":1 ";
 
     // TODO Category, topic and entity intersection
-    // TODO Weekday, hour
     // TODO Doc timestamp diff
 
-    line << std::endl;
+    line.append("\n");
 
     return line.str();
 }
