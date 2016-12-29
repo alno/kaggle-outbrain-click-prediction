@@ -106,9 +106,9 @@ reference_data load_reference_data() {
     res.events = read_events();
     res.ads = read_ads();
     res.documents = read_map("cache/documents.csv.gz", read_document);
-    res.document_categories = read_multi_map("../input/document_categories.csv.gz", read_document_annotation);
-    res.document_topics = read_multi_map("../input/document_topics.csv.gz", read_document_annotation);
-    res.document_entities = read_multi_map("cache/document_entities.csv.gz", read_document_annotation);
+    res.document_categories = read_multi_map("../input/documents_categories.csv.gz", read_document_annotation);
+    res.document_topics = read_multi_map("../input/documents_topics.csv.gz", read_document_annotation);
+    res.document_entities = read_multi_map("cache/documents_entities.csv.gz", read_document_annotation);
 
     return res;
 }
