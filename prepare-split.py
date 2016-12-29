@@ -29,8 +29,8 @@ del train
 print "Splitting leak..."
 
 leak = pd.read_csv('cache/leak_full_train.csv.gz', dtype=np.uint8)
-leak[~train_is_val].to_csv('cache/leak_val_train.csv.gz', index=True, compression='gzip')
-leak[train_is_val].to_csv('cache/leak_val_test.csv.gz', index=True, compression='gzip')
+leak[~train_is_val].to_csv('cache/leak_val_train.csv.gz', index=False, compression='gzip')
+leak[train_is_val].to_csv('cache/leak_val_test.csv.gz', index=False, compression='gzip')
 
 del leak
 
