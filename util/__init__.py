@@ -30,7 +30,7 @@ def gen_submission(pred):
 
 def score_prediction(pred):
     pred = pred.sort_values(['display_id', 'pred'], ascending=[True, False])[['display_id', 'clicked']]
-    pred = pd.merge(pred, pd.read_csv("../input/events.csv.zip", dtype=np.int32, index_col=0, usecols=[0, 3]), left_on='display_id', right_index=True)
+    pred = pd.merge(pred, pd.read_csv("cache/events.csv.gz", dtype=np.int32, index_col=0, usecols=[0, 3]), left_on='display_id', right_index=True)
 
     cur_idx = None
     cur_rank = None

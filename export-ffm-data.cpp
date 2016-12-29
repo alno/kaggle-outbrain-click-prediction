@@ -56,6 +56,7 @@ std::string encode_row(const reference_data & data, const std::vector<std::vecto
     line << label;
     line << " 0:" << h(ad_id) << ":1 1:" << event.platform << ":1 2:" << h(ad.campaign_id) << ":1 3:" << h(ad.advertiser_id) << ":1";
     line << " 4:" << h(event.country) << ":1 5:" << h(event.state) << ":1 ";
+    line << " 22:" << event.hour << ":1 23:" << event.weekday << ":1 ";
 
     // Document info
     line << " 6:" << h(event.document_id) << ":1 7:" << h(ev_doc.source_id) << ":1 8:" << h(ev_doc.publisher_id) << ":1";
@@ -70,16 +71,16 @@ std::string encode_row(const reference_data & data, const std::vector<std::vecto
         line << " 16:" << h(it->second.first) << ":" << it->second.second;
 
     // Promoted document info
-    line << " 9:" << h(ad.document_id) << ":1 10:" << h(ad_doc.source_id) << ":1 11:" << h(ad_doc.publisher_id) << ":1";
+    line << " 9:" << h(ad.document_id ^ 16769023) << ":1 10:" << h(ad_doc.source_id ^ 16769023) << ":1 11:" << h(ad_doc.publisher_id ^ 16769023) << ":1";
 
     for (auto it = ad_doc_categories.first; it != ad_doc_categories.second; ++ it)
-        line << " 13:" << h(it->second.first) << ":" << it->second.second;
+        line << " 13:" << h(it->second.first ^ 16769023) << ":" << it->second.second;
 
     for (auto it = ad_doc_topics.first; it != ad_doc_topics.second; ++ it)
-        line << " 15:" << h(it->second.first) << ":" << it->second.second;
+        line << " 15:" << h(it->second.first ^ 16769023) << ":" << it->second.second;
 
     for (auto it = ad_doc_entities.first; it != ad_doc_entities.second; ++ it)
-        line << " 17:" << h(it->second.first) << ":" << it->second.second;
+        line << " 17:" << h(it->second.first ^ 16769023) << ":" << it->second.second;
 
     if (ad_doc.publisher_id == ev_doc.publisher_id)
         line << " 18:1001:1"; // Same publisher
