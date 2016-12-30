@@ -9,10 +9,8 @@ from scipy.special import expit
 from util.meta import full_split, val_split
 from util import gen_prediction_name, gen_submission, score_prediction, print_and_exec
 
-vw_options = "--passes 3 -b 22 -q aa -q al -q ld -q lp -q dp -q fa -q fd -q fl -q fp -q ff --nn 10"
 
-
-def fit_predict(split, split_name):
+def fit_predict(profile, split, split_name):
     train_file = 'cache/%s_train_vw.txt' % split_name
     pred_file = 'cache/%s_test_vw.txt' % split_name
 
@@ -21,7 +19,9 @@ def fit_predict(split, split_name):
     if os.path.exists(train_file + '.cache'):
         os.remove(train_file + '.cache')
 
-    print_and_exec("vw --cache -P 5000000 --loss_function logistic %s -f /tmp/vw.model %s " % (vw_options, train_file))
+    interactions = ' '.join('-q %s' % i for i in profile['interactions'].split(' '))
+
+    print_and_exec("vw --cache -P 5000000 --loss_function logistic %s %s -f /tmp/vw.model %s " % (profile['options'], interactions, train_file))
 
     print "  Predicting..."
 
@@ -36,10 +36,25 @@ def fit_predict(split, split_name):
     return pred
 
 
+profiles = {
+    'p1': {
+        'interactions': 'aa al ld lp dp fe fa fd fl fp ff',
+        'options': "--passes 3 -b 22 --nn 10 --ignore u --ignore t",
+    },
+
+    'p2': {
+        'interactions': 'aa al ld lp dp ft fa fd fl fp ff tt ta tl td tp up',
+        'options': "--passes 4 -b 23 --nn 20",
+    }
+}
+
+
 parser = argparse.ArgumentParser(description='Train VW model')
+parser.add_argument('profile', type=str, help='Train profile')
 parser.add_argument('--rewrite-cache', action='store_true', help='Drop cache files prior to train')
 
 args = parser.parse_args()
+profile = profiles[args.profile]
 
 
 if not os.path.exists('cache/val_train_vw.txt') or args.rewrite_cache:
@@ -51,12 +66,12 @@ if not os.path.exists('cache/val_train_vw.txt') or args.rewrite_cache:
 
 print "Validation split..."
 
-pred = fit_predict(val_split, 'val')
+pred = fit_predict(profile, val_split, 'val')
 
 print "  Scoring..."
 
 present_score, future_score, score = score_prediction(pred)
-name = gen_prediction_name('vw', score)
+name = gen_prediction_name('vw-%s' % args.profile, score)
 
 print "  Present score: %.5f" % present_score
 print "  Future score: %.5f" % future_score
@@ -70,7 +85,7 @@ del pred
 
 print "Full split..."
 
-pred = fit_predict(full_split, 'full')
+pred = fit_predict(profile, full_split, 'full')
 pred[['display_id', 'ad_id', 'pred']].to_pickle('preds/%s-test.pickle' % name)
 
 print "  Generating submission..."

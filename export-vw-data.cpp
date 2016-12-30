@@ -37,8 +37,10 @@ std::string encode_row(const reference_data & data, const std::vector<std::vecto
     if (label >= 0)
         line << (label * 2 - 1) << " ";
 
-    line << "|a ad_" << ad_id << " p_" << event.platform << " ac_" << ad.campaign_id << " aa_" << ad.advertiser_id;
-    line << "|l c_" << event.country << " s_" << event.state;
+    line << "|a ad_" << ad_id << " ac_" << ad.campaign_id << " aa_" << ad.advertiser_id;
+    line << "|l c_" << event.country << " s_" << event.state << " p_" << event.platform;
+    line << "|t h_" << event.hour << " w_" << event.weekday;
+    line << "|u u_" << event.uid;
 
     // Document info
     line << "|d ed_" << event.document_id << " eds_" << ev_doc.source_id << " edp_" << ev_doc.publisher_id;
