@@ -5,6 +5,7 @@
 #include <sstream>
 #include <vector>
 #include <unordered_map>
+#include <algorithm>
 #include <ctime>
 
 #include <boost/iostreams/device/file.hpp>
@@ -96,7 +97,7 @@ std::unordered_map<K, T> read_map(const std::string & file_name, std::pair<K, T>
 
 
 template <typename K, typename T>
-std::vector<T> read_vector(const std::string & file_name, std::pair<K, T> read_entry(const std::vector<std::string> &), size_t size) {
+void read_vector(std::vector<T> & res, const std::string & file_name, std::pair<K, T> read_entry(const std::vector<std::string> &), size_t size) {
     using namespace std;
 
     clock_t begin = clock();
@@ -105,7 +106,6 @@ std::vector<T> read_vector(const std::string & file_name, std::pair<K, T> read_e
     cout.flush();
 
     compressed_csv_file file(file_name);
-    vector<T> res;
 
     // Resize vector to contain all elements
     res.resize(size);
@@ -130,7 +130,13 @@ std::vector<T> read_vector(const std::string & file_name, std::pair<K, T> read_e
     double elapsed = double(end - begin) / CLOCKS_PER_SEC;
 
     cout << "done in " << elapsed << " seconds." << endl;
+}
 
+
+template <typename K, typename T>
+std::vector<T> read_vector(const std::string & file_name, std::pair<K, T> read_entry(const std::vector<std::string> &), size_t size) {
+    std::vector<T> res;
+    read_vector(res, file_name, read_entry, size);
     return res;
 }
 
@@ -166,5 +172,52 @@ std::unordered_multimap<K, T> read_multi_map(const std::string & file_name, std:
 
     cout << "done in " << elapsed << " seconds, " << res.size() << " records." << endl;
 
+    return res;
+}
+
+
+template <typename K, typename T>
+void read_sorted_vector_map(std::unordered_map<K, std::vector<T>> & res, const std::string & file_name, std::pair<K, T> read_entry(const std::vector<std::string> &)) {
+    using namespace std;
+
+    clock_t begin = clock();
+
+    cout << "  Loading " << boost::typeindex::type_id<T>().pretty_name() << "s... ";
+    cout.flush();
+
+    compressed_csv_file file(file_name);
+
+    for (int i = 0;; ++i) {
+        vector<string> row = file.getrow();
+
+        if (row.empty())
+            break;
+
+        auto e = read_entry(row);
+
+        if (res.count(e.first) == 0)
+            res.insert(std::make_pair(e.first, vector<T>()));
+
+        res.at(e.first).push_back(move(e.second));
+
+        if (i > 0 && i % 5000000 == 0) {
+            cout << (i / 1000000) << "M... ";
+            cout.flush();
+        }
+    }
+
+    for (auto it = res.begin(); it != res.end(); ++ it)
+        std::sort(it->second.begin(), it->second.end());
+
+    clock_t end = clock();
+    double elapsed = double(end - begin) / CLOCKS_PER_SEC;
+
+    cout << "done in " << elapsed << " seconds, " << res.size() << " records." << endl;
+}
+
+template <typename K, typename T>
+std::unordered_map<K, std::vector<T>> read_sorted_vector_map(const std::string & file_name, std::pair<K, T> read_entry(const std::vector<std::string> &)) {
+    std::unordered_map<K, std::vector<T>> res;
+    read_sorted_vector_map(res, file_name, read_entry);
     return res;
 }

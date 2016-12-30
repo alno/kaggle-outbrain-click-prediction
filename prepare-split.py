@@ -19,7 +19,7 @@ train_is_val = train.index.isin(events[(events['timestamp'] >= val_split_time) |
 
 del events
 
-print "Saving..."
+print "Splitting clicks..."
 
 train[~train_is_val].to_csv(val_split[0], index=True, compression='gzip')
 train[train_is_val].to_csv(val_split[1], index=True, compression='gzip')
@@ -33,5 +33,13 @@ leak[~train_is_val].to_csv('cache/leak_val_train.csv.gz', index=False, compressi
 leak[train_is_val].to_csv('cache/leak_val_test.csv.gz', index=False, compression='gzip')
 
 del leak
+
+print "Splitting similarity..."
+
+similarity = pd.read_csv('cache/similarity_full_train.csv.gz')
+similarity[~train_is_val].to_csv('cache/similarity_val_train.csv.gz', index=False, compression='gzip')
+similarity[train_is_val].to_csv('cache/similarity_val_test.csv.gz', index=False, compression='gzip')
+
+del similarity
 
 print "Done."
