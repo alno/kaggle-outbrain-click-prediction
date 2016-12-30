@@ -10,9 +10,9 @@ struct event {
     uint32_t document_id;
     uint32_t uid;
     int64_t timestamp;
-    uint8_t platform;
-    uint8_t weekday;
-    uint8_t hour;
+    uint16_t platform;
+    uint16_t weekday;
+    uint16_t hour;
     std::string country;
     std::string state;
     std::string region;
