@@ -17,7 +17,7 @@ def fit_predict(profile, split, split_name):
     if os.path.exists(train_file + '.cache'):
         os.remove(train_file + '.cache')
 
-    opts = "-t 3 -s 4"
+    opts = profile['options']
 
     if split_name == "val":
         opts += " -p cache/val_test_ffm.txt"
@@ -38,7 +38,13 @@ def fit_predict(profile, split, split_name):
 
 
 profiles = {
-    'p1': {}
+    'p1': {
+        'options': "-t 3 -s 4",
+    },
+
+    'p2': {
+        'options': "-l 0.00005 -r 0.1 -t 13 -s 9",
+    },
 }
 
 

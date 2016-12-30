@@ -3,6 +3,7 @@
 #include "util/generation.h"
 
 #include <functional>
+#include <cmath>
 
 std::vector<std::pair<std::vector<std::string>, std::string>> filesets = {
     { { "cache/clicks_val_train.csv.gz", "cache/leak_val_train.csv.gz" }, "cache/val_train_ffm.txt" },
@@ -64,6 +65,34 @@ public:
 };
 
 
+template <typename R>
+float similarity(const R & ra, const R & rb) {
+    float sum = 0.0;
+
+    for (auto ia = ra.first; ia != ra.second; ++ ia)
+        for (auto ib = rb.first; ib != rb.second; ++ ib)
+            if (ia->second.first == ib->second.first)
+                sum += ia->second.second * ib->second.second;
+
+    return sum;
+}
+
+
+inline float pos_time_diff(int64_t td) {
+    if (td < 0)
+        return 0;
+
+    return log(1 + td) / 100;
+}
+
+inline float time_diff(int64_t td) {
+    if (td < 0)
+        return - log(1 - td) / 100;
+
+    return log(1 + td) / 100;
+}
+
+
 std::string encode_row(const reference_data & data, const std::vector<std::vector<std::string>> & rows) {
     int event_id = stoi(rows[0][0]);
     int ad_id = stoi(rows[0][1]);
@@ -79,13 +108,13 @@ std::string encode_row(const reference_data & data, const std::vector<std::vecto
 
     auto ad_doc = data.documents.at(ad.document_id);
     auto ad_doc_categories = data.document_categories.equal_range(ad.document_id);
-    auto ad_doc_topics = data.document_topics.equal_range(ad.document_id);
-    auto ad_doc_entities = data.document_entities.equal_range(ad.document_id);
+    //auto ad_doc_topics = data.document_topics.equal_range(ad.document_id);
+    //auto ad_doc_entities = data.document_entities.equal_range(ad.document_id);
 
     auto ev_doc = data.documents.at(event.document_id);
     auto ev_doc_categories = data.document_categories.equal_range(event.document_id);
-    auto ev_doc_topics = data.document_topics.equal_range(event.document_id);
-    auto ev_doc_entities = data.document_entities.equal_range(event.document_id);
+    //auto ev_doc_topics = data.document_topics.equal_range(event.document_id);
+    //auto ev_doc_entities = data.document_entities.equal_range(event.document_id);
 
     // Start building line
     line_builder line(label);
@@ -106,11 +135,13 @@ std::string encode_row(const reference_data & data, const std::vector<std::vecto
     for (auto it = ev_doc_categories.first; it != ev_doc_categories.second; ++ it)
         line.feature(12, it->second.first, it->second.second);
 
+    /*
     for (auto it = ev_doc_topics.first; it != ev_doc_topics.second; ++ it)
         line.feature(14, it->second.first, it->second.second);
 
     for (auto it = ev_doc_entities.first; it != ev_doc_entities.second; ++ it)
         line.feature(16, it->second.first, it->second.second);
+    */
 
     // Promoted document info
     line.feature(9, ad.document_id);
@@ -120,27 +151,46 @@ std::string encode_row(const reference_data & data, const std::vector<std::vecto
     for (auto it = ad_doc_categories.first; it != ad_doc_categories.second; ++ it)
         line.feature(13, it->second.first, it->second.second);
 
+    /*
     for (auto it = ad_doc_topics.first; it != ad_doc_topics.second; ++ it)
         line.feature(15, it->second.first, it->second.second);
 
     for (auto it = ad_doc_entities.first; it != ad_doc_entities.second; ++ it)
         line.feature(17, it->second.first, it->second.second);
+    */
 
     //
 
     if (ad_doc.publisher_id == ev_doc.publisher_id)
-        line.append(" 18:1:1"); // Same publisher
+        line.append(" 18:0:1"); // Same publisher
 
     if (ad_doc.source_id == ev_doc.source_id)
-        line.append(" 19:2:1"); // Same source
+        line.append(" 19:1:1"); // Same source
 
     if (leak_viewed > 0)
-        line.append(" 20:3:1"); // Same source
+        line.append(" 20:2:1"); // Same source
 
     if (leak_not_viewed > 0)
-        line.append(" 21:4:1"); // Same source
+        line.append(" 21:3:1"); // Same source
 
-    line.stream << " 22:" << (event.weekday + 50) << ":1 23:" << (event.hour + 70) << ":1 ";
+    line.stream << " 22:" << (event.weekday + 50) << ":1 23:" << (event.hour + 70) << ":1";
+
+    line.stream << " 24:4:" << pos_time_diff(event.timestamp - ad_doc.publish_timestamp);
+    line.stream << " 25:5:" << time_diff(ev_doc.publish_timestamp - ad_doc.publish_timestamp);
+
+    /*
+    float sim_categories = similarity(ad_doc_categories, ev_doc_categories);
+    if (sim_categories > 0)
+        line.stream << " 26:6:" << sim_categories;
+
+    float sim_topics = similarity(ad_doc_topics, ev_doc_topics);
+    if (sim_topics > 0)
+        line.stream << " 27:7:" << sim_topics;
+
+    float sim_entities = similarity(ad_doc_entities, ev_doc_entities);
+    if (sim_entities > 0)
+        line.stream << " 28:8:" << sim_entities;
+    */
 
     // TODO Category, topic and entity intersection
     // TODO Doc timestamp diff
