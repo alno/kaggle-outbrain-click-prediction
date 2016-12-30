@@ -15,7 +15,7 @@ std::vector<std::pair<std::vector<std::string>, std::string>> filesets = {
 std::hash<std::string> str_hash;
 
 uint32_t hash_offset = 100;
-uint32_t hash_base = 1 << 18;
+uint32_t hash_base = 1 << 19;
 
 uint32_t h(uint32_t a, uint32_t f) {
     a = a + f * 2654435761;
