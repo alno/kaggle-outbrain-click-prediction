@@ -3,10 +3,10 @@
 #include "util/generation.h"
 
 std::vector<std::pair<std::vector<std::string>, std::string>> filesets = {
-    { { "cache/clicks_val_train.csv.gz", "cache/leak_val_train.csv.gz" }, "cache/val_train_vw.txt" },
-    { { "cache/clicks_val_test.csv.gz", "cache/leak_val_test.csv.gz" }, "cache/val_test_vw.txt" },
-    { { "../input/clicks_train.csv.gz", "cache/leak_full_train.csv.gz" }, "cache/full_train_vw.txt" },
-    { { "../input/clicks_test.csv.gz", "cache/leak_full_test.csv.gz" }, "cache/full_test_vw.txt" },
+    { { "cache/clicks_val_train.csv.gz", "cache/leak_val_train.csv.gz", "cache/similarity_val_train.csv.gz" }, "cache/val_train_vw.txt" },
+    { { "cache/clicks_val_test.csv.gz", "cache/leak_val_test.csv.gz", "cache/similarity_val_test.csv.gz" }, "cache/val_test_vw.txt" },
+    { { "../input/clicks_train.csv.gz", "cache/leak_full_train.csv.gz", "cache/similarity_full_train.csv.gz" }, "cache/full_train_vw.txt" },
+    { { "../input/clicks_test.csv.gz", "cache/leak_full_test.csv.gz", "cache/similarity_full_test.csv.gz" }, "cache/full_test_vw.txt" },
 };
 
 std::string encode_row(const reference_data & data, const std::vector<std::vector<std::string>> & rows) {
@@ -81,6 +81,10 @@ std::string encode_row(const reference_data & data, const std::vector<std::vecto
 
     if (leak_not_viewed > 0)
         line << " nv"; // Same source
+
+    // Similarity features
+    for (int i = 0; i < rows[2].size(); ++ i)
+        line << " s_" << i << ':' << rows[2][i];
 
     line << std::endl;
 
