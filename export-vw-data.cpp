@@ -93,7 +93,7 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
         line << " nv"; // Same source
 
     // Similarity features
-    for (int i = 0; i < rows[2].size(); ++ i)
+    for (uint i = 0; i < rows[2].size(); ++ i)
         line << " s_" << i << ':' << rows[2][i];
 
     line << std::endl;

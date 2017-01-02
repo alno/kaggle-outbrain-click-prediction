@@ -14,9 +14,6 @@ def fit_predict(profile, split, split_name):
 
     print "  Training..."
 
-    if os.path.exists(train_file + '.cache'):
-        os.remove(train_file + '.cache')
-
     opts = profile['options']
 
     if split_name == "val":
@@ -25,9 +22,6 @@ def fit_predict(profile, split, split_name):
     print_and_exec("ffm-train %s %s /tmp/ffm.model" % (opts, train_file))
 
     print "  Predicting..."
-
-    if os.path.exists(pred_file + '.cache'):
-        os.remove(pred_file + '.cache')
 
     print_and_exec("ffm-predict %s /tmp/ffm.model /tmp/ffm.preds" % pred_file)
 
