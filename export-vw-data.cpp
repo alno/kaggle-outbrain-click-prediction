@@ -9,7 +9,17 @@ std::vector<std::pair<std::vector<std::string>, std::string>> filesets = {
     { { "../input/clicks_test.csv.gz", "cache/leak_full_test.csv.gz", "cache/similarity_full_test.csv.gz" }, "cache/full_test_vw.txt" },
 };
 
-std::string encode_row(const reference_data & data, const std::vector<std::vector<std::string>> & rows) {
+class writer {
+    std::ofstream out;
+public:
+    writer(const std::string & file_name) : out(file_name) {}
+
+    void write(const reference_data & data, const std::vector<std::vector<std::string>> & rows);
+    void finish() {}
+};
+
+
+void writer::write(const reference_data & data, const std::vector<std::vector<std::string>> & rows) {
     int event_id = stoi(rows[0][0]);
     int ad_id = stoi(rows[0][1]);
     int label = rows[0].size() == 3 ? stoi(rows[0][2]) : -1;
@@ -88,7 +98,7 @@ std::string encode_row(const reference_data & data, const std::vector<std::vecto
 
     line << std::endl;
 
-    return line.str();
+    out << line.str();
 }
 
 int main() {
@@ -98,7 +108,7 @@ int main() {
     auto data = load_reference_data();
 
     cout << "Generating files..." << endl;
-    generate_files(data, filesets, encode_row);
+    generate_files<reference_data, writer>(data, filesets);
 
     cout << "Done." << endl;
 }
