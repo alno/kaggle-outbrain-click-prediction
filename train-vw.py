@@ -77,7 +77,7 @@ print "  Present score: %.5f" % present_score
 print "  Future score: %.5f" % future_score
 print "  Total score: %.5f" % score
 
-pred[['display_id', 'ad_id', 'pred']].to_pickle('preds/%s-val.pickle' % name)
+pred[['pred']].to_pickle('preds/%s-val.pickle' % name)
 
 del pred
 
@@ -86,7 +86,7 @@ del pred
 print "Full split..."
 
 pred = fit_predict(profile, full_split, 'full')
-pred[['display_id', 'ad_id', 'pred']].to_pickle('preds/%s-test.pickle' % name)
+pred[['pred']].to_pickle('preds/%s-test.pickle' % name)
 
 print "  Generating submission..."
 subm = gen_submission(pred)
