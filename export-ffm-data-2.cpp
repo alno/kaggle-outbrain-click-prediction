@@ -18,7 +18,9 @@ std::hash<std::string> str_hash;
 
 uint32_t hash_offset = 100;
 uint32_t hash_base = 1 << 19;
-float norm = 4.0;
+
+uint32_t max_index = 0;
+uint32_t max_field = 0;
 
 uint32_t h(uint32_t a, uint32_t f) {
     a = a + f * 2654435761;
@@ -38,7 +40,13 @@ ffm_feature feature_raw(uint32_t field, uint32_t index, float value = 1.0) {
     ffm_feature f;
     f.field = field;
     f.index = index;
-    f.value = value / norm;
+    f.value = value;
+
+    if (index > max_index)
+        max_index = index;
+
+    if (field > max_field)
+        max_field = field;
 
     return f;
 }
@@ -63,6 +71,15 @@ inline float time_diff(int64_t td) {
         return - log(1 - td) / 100;
 
     return log(1 + td) / 100;
+}
+
+ffm_float norm(const std::vector<ffm_feature> & features) {
+    ffm_float norm = 0.0;
+
+    for (auto fi = features.begin(); fi != features.end(); ++ fi)
+        norm += fi->value * fi->value;
+
+    return norm;
 }
 
 
@@ -158,22 +175,23 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
         features.push_back(feature_raw(19, 1)); // Same source
 
     if (leak_viewed > 0)
-        features.push_back(feature_raw(20, 2)); // Same source
+        features.push_back(feature_raw(20, 2)); // Viewed
 
     if (leak_not_viewed > 0)
-        features.push_back(feature_raw(21, 3)); // Same source
+        features.push_back(feature_raw(21, 3)); // Not viewed
 
     features.push_back(feature_raw(22, event.weekday + 50));
-    features.push_back(feature_raw(23, event.weekday + 70));
+    features.push_back(feature_raw(23, event.hour + 70));
 
     features.push_back(feature_raw(24, 4, pos_time_diff(event.timestamp - ad_doc.publish_timestamp)));
     features.push_back(feature_raw(25, 5, time_diff(ev_doc.publish_timestamp - ad_doc.publish_timestamp)));
 
     // Similarity features
+    /*
     for (uint i = 0; i < rows[2].size(); ++ i)
         if (stof(rows[2][i]) > 0)
             features.push_back(feature_raw(26 + i, 6 + i, stof(rows[2][i])));
-
+*/
     // TODO Category, topic and entity intersection
     // TODO Doc timestamp diff
 
@@ -184,6 +202,7 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     index.size ++;
     index.labels.push_back(rows[0].size() == 3 ? stof(rows[0][2]) * 2 - 1 : 0);
     index.offsets.push_back(offset);
+    index.norms.push_back(norm(features));
 }
 
 
@@ -200,6 +219,9 @@ int main() {
 
     cout << "Generating files..." << endl;
     generate_files<reference_data, writer>(data, filesets);
+
+    cout << "Max field: " << max_field << endl;
+    cout << "Max index: " << max_index << endl;
 
     cout << "Done." << endl;
 }

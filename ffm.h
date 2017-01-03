@@ -8,6 +8,7 @@ typedef void * ffm_file;
 typedef uint32_t ffm_uint;
 typedef uint64_t ffm_ulong;
 typedef float ffm_float;
+typedef double ffm_double;
 
 struct ffm_feature {
     ffm_uint field;
@@ -21,6 +22,7 @@ struct ffm_index {
 
     std::vector<ffm_float> labels; // Target values of examples (size N)
     std::vector<ffm_ulong> offsets; // Offsets of example data (size N +1) in number of features
+    std::vector<ffm_float> norms; // Squares of l2 norm of examples (size N)
 };
 
 // IO functions

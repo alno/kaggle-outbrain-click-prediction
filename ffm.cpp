@@ -1,34 +1,51 @@
 #include "ffm.h"
 
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <random>
 #include <algorithm>
 
 #include <pmmintrin.h>
+
 #include <omp.h>
 
 #include <boost/program_options.hpp>
 
-ffm_uint batch_size = 500000;
+
+const ffm_uint align_bytes = 16;
+const ffm_uint align_floats = align_bytes / sizeof(ffm_float);
+
+
+ffm_float * malloc_aligned_float(ffm_ulong size) {
+    void *ptr;
+
+    int status = posix_memalign(&ptr, align_bytes, size*sizeof(ffm_float));
+
+    if(status != 0)
+        throw std::bad_alloc();
+
+    return (ffm_float*) ptr;
+}
+
+ffm_uint batch_size = 10000;
+ffm_uint mini_batch_size = 32;
 ffm_uint n_threads = 4;
 
 const ffm_ulong n_features = (1 << 19) + 100;
-const ffm_ulong n_fields = 50;
+const ffm_ulong n_fields = 30;
 const ffm_ulong n_dim = 4;
 
 
-ffm_float weights[n_features * n_fields * n_dim * 2];
+ffm_float * weights;
 
 const ffm_ulong index_stride = n_fields * n_dim * 2;
 const ffm_ulong field_stride = n_dim * 2;
 
-std::default_random_engine rnd(1234);
-
-ffm_float norm = 1.0;
+std::default_random_engine rnd(2017);
 
 ffm_float eta = 0.2;
-ffm_float lambda = 0.0004;
+ffm_float lambda = 0.00002;
 
 
 template <typename T>
@@ -42,23 +59,23 @@ struct ffm_dataset {
 };
 
 
-ffm_float predict(const ffm_feature * start, const ffm_feature * end) {
+ffm_float predict(const ffm_feature * start, const ffm_feature * end, ffm_float norm) {
     __m128 xmm_total = _mm_setzero_ps();
 
     for (const ffm_feature * fa = start; fa != end; ++ fa) {
         ffm_uint field_a = fa->field;
         ffm_uint index_a = fa->index;
-        ffm_float value_a = fa->value / norm;
+        ffm_float value_a = fa->value;
 
-        for (const ffm_feature * fb = start + 1; fb != end; ++ fb) {
+        for (const ffm_feature * fb = fa + 1; fb != end; ++ fb) {
             ffm_uint field_b = fb->field;
             ffm_uint index_b = fb->index;
-            ffm_float value_b = fb->value / norm;
+            ffm_float value_b = fb->value;
 
             ffm_float * wa = weights + index_a * index_stride + field_b * field_stride;
             ffm_float * wb = weights + index_b * index_stride + field_a * field_stride;
 
-            __m128 xmm_val = _mm_set1_ps(value_a * value_b);
+            __m128 xmm_val = _mm_set1_ps(value_a * value_b / norm);
 
             for(ffm_uint d = 0; d < n_dim; d += 4) {
                 __m128 xmm_wa = _mm_load_ps(wa + d);
@@ -80,19 +97,19 @@ ffm_float predict(const ffm_feature * start, const ffm_feature * end) {
 }
 
 
-void update(const ffm_feature * start, const ffm_feature * end, ffm_float kappa) {
+void update(const ffm_feature * start, const ffm_feature * end, ffm_float norm, ffm_float kappa) {
     __m128 xmm_eta = _mm_set1_ps(eta);
     __m128 xmm_lambda = _mm_set1_ps(lambda);
 
     for (const ffm_feature * fa = start; fa != end; ++ fa) {
         ffm_uint field_a = fa->field;
         ffm_uint index_a = fa->index;
-        ffm_float value_a = fa->value / norm;
+        ffm_float value_a = fa->value;
 
-        for (const ffm_feature * fb = start + 1; fb != end; ++ fb) {
+        for (const ffm_feature * fb = fa + 1; fb != end; ++ fb) {
             ffm_uint field_b = fb->field;
             ffm_uint index_b = fb->index;
-            ffm_float value_b = fb->value / norm;
+            ffm_float value_b = fb->value;
 
             ffm_float * wa = weights + index_a * index_stride + field_b * field_stride;
             ffm_float * wb = weights + index_b * index_stride + field_a * field_stride;
@@ -100,7 +117,7 @@ void update(const ffm_feature * start, const ffm_feature * end, ffm_float kappa)
             ffm_float * wga = wa + n_dim;
             ffm_float * wgb = wb + n_dim;
 
-            __m128 xmm_kappa_val = _mm_set1_ps(kappa * value_a * value_b);
+            __m128 xmm_kappa_val = _mm_set1_ps(kappa * value_a * value_b / norm);
 
             for(ffm_uint d = 0; d < n_dim; d += 4) {
                 // Load weights
@@ -146,7 +163,19 @@ std::vector<std::pair<ffm_ulong, ffm_ulong>> generate_batches(const ffm_index & 
 }
 
 
-ffm_float train_on_dataset(const ffm_dataset & dataset) {
+std::vector<std::pair<ffm_ulong, ffm_ulong>> generate_mini_batches(ffm_ulong begin, ffm_ulong end) {
+    std::vector<std::pair<ffm_ulong, ffm_ulong>> batches;
+
+    for (ffm_ulong mini_batch_start = begin; mini_batch_start < end; mini_batch_start += mini_batch_size)
+        batches.push_back(std::make_pair(mini_batch_start, min(mini_batch_start + mini_batch_size, end)));
+
+    std::shuffle(batches.begin(), batches.end(), rnd);
+
+    return batches;
+}
+
+
+ffm_double train_on_dataset(const ffm_dataset & dataset) {
     clock_t begin = clock();
 
     std::cout << "  Training... ";
@@ -154,7 +183,7 @@ ffm_float train_on_dataset(const ffm_dataset & dataset) {
 
     auto batches = generate_batches(dataset.index, true);
 
-    ffm_float loss = 0.0f;
+    ffm_double loss = 0.0;
     ffm_ulong cnt = 0;
 
     // Iterate over batches, read each and then iterate over examples
@@ -166,21 +195,26 @@ ffm_float train_on_dataset(const ffm_dataset & dataset) {
         auto batch_start_offset = dataset.index.offsets[batch_start_index];
         auto batch_end_offset = dataset.index.offsets[batch_end_index];
 
+        auto mini_batches = generate_mini_batches(batch_start_index, batch_end_index);
+
         std::vector<ffm_feature> batch_features = ffm_read_batch(dataset.data_file_name, batch_start_offset, batch_end_offset);
         ffm_feature * batch_features_data = batch_features.data();
 
-        for (auto ei = batch_start_index; ei < batch_end_index; ++ ei) {
-            ffm_float y = dataset.index.labels[ei];
+        for (auto mb = mini_batches.begin(); mb != mini_batches.end(); ++ mb) {
+            for (auto ei = mb->first; ei < mb->second; ++ ei) {
+                ffm_float y = dataset.index.labels[ei];
+                ffm_float norm = dataset.index.norms[ei];
 
-            auto start_offset = dataset.index.offsets[ei] - batch_start_offset;
-            auto end_offset = dataset.index.offsets[ei+1] - batch_start_offset;
+                auto start_offset = dataset.index.offsets[ei] - batch_start_offset;
+                auto end_offset = dataset.index.offsets[ei+1] - batch_start_offset;
 
-            ffm_float t = predict(batch_features_data + start_offset, batch_features_data + end_offset);
-            ffm_float expnyt = exp(-y*t);
+                ffm_float t = predict(batch_features_data + start_offset, batch_features_data + end_offset, norm);
+                ffm_float expnyt = exp(-y*t);
 
-            loss += log(1+expnyt);
+                loss += log(1+expnyt);
 
-            update(batch_features_data + start_offset, batch_features_data + end_offset, -y * expnyt / (1+expnyt));
+                update(batch_features_data + start_offset, batch_features_data + end_offset, norm, -y * expnyt / (1+expnyt));
+            }
         }
 
         cnt += batch_end_index - batch_start_index;
@@ -195,7 +229,7 @@ ffm_float train_on_dataset(const ffm_dataset & dataset) {
 }
 
 
-ffm_float evaluate_on_dataset(const ffm_dataset & dataset) {
+ffm_double evaluate_on_dataset(const ffm_dataset & dataset) {
     clock_t begin = clock();
 
     std::cout << "  Evaluating... ";
@@ -203,7 +237,7 @@ ffm_float evaluate_on_dataset(const ffm_dataset & dataset) {
 
     auto batches = generate_batches(dataset.index, false);
 
-    ffm_float loss = 0.0f;
+    ffm_double loss = 0.0;
     ffm_ulong cnt = 0;
 
     // Iterate over batches, read each and then iterate over examples
@@ -220,11 +254,12 @@ ffm_float evaluate_on_dataset(const ffm_dataset & dataset) {
 
         for (auto ei = batch_start_index; ei < batch_end_index; ++ ei) {
             ffm_float y = dataset.index.labels[ei];
+            ffm_float norm = dataset.index.norms[ei];
 
             auto start_offset = dataset.index.offsets[ei] - batch_start_offset;
             auto end_offset = dataset.index.offsets[ei+1] - batch_start_offset;
 
-            ffm_float t = predict(batch_features_data + start_offset, batch_features_data + end_offset);
+            ffm_float t = predict(batch_features_data + start_offset, batch_features_data + end_offset, norm);
             ffm_float expnyt = exp(-y*t);
 
             loss += log(1+expnyt);
@@ -264,10 +299,12 @@ void predict_on_dataset(const ffm_dataset & dataset, std::ostream & out) {
         ffm_feature * batch_features_data = batch_features.data();
 
         for (auto ei = batch_start_index; ei < batch_end_index; ++ ei) {
+            ffm_float norm = dataset.index.norms[ei];
+
             auto start_offset = dataset.index.offsets[ei] - batch_start_offset;
             auto end_offset = dataset.index.offsets[ei+1] - batch_start_offset;
 
-            ffm_float t = predict(batch_features_data + start_offset, batch_features_data + end_offset);
+            ffm_float t = predict(batch_features_data + start_offset, batch_features_data + end_offset, norm);
 
             out << 1/(1+exp(-t)) << std::endl;
         }
@@ -283,6 +320,8 @@ void predict_on_dataset(const ffm_dataset & dataset, std::ostream & out) {
 
 
 void init_model() {
+    weights = malloc_aligned_float(n_features * n_fields * n_dim * 2);
+
     std::uniform_real_distribution<ffm_float> distribution(0.0, 1.0);
 
     ffm_float * w = weights;

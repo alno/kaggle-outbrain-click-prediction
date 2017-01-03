@@ -17,6 +17,9 @@ void ffm_write_index(const std::string & file_name, const ffm_index & index) {
     if (index.offsets.size() != index.size + 1)
         throw runtime_error("Invalid index offsets size");
 
+    if (index.norms.size() != index.size)
+        throw runtime_error("Invalid index norms size");
+
     FILE * file = fopen(file_name.c_str(), "wb");
 
     if(file == nullptr)
@@ -26,10 +29,13 @@ void ffm_write_index(const std::string & file_name, const ffm_index & index) {
         throw runtime_error("Error writing example count");
 
     if (fwrite(index.labels.data(), sizeof(ffm_float), index.labels.size(), file) != index.labels.size())
-        throw runtime_error("Error writing y");
+        throw runtime_error("Error writing labels");
 
     if (fwrite(index.offsets.data(), sizeof(ffm_ulong), index.offsets.size(), file) != index.offsets.size())
         throw runtime_error("Error writing offsets");
+
+    if (fwrite(index.norms.data(), sizeof(ffm_float), index.norms.size(), file) != index.norms.size())
+        throw runtime_error("Error writing norms");
 
     fclose(file);
 }
@@ -49,12 +55,16 @@ ffm_index ffm_read_index(const std::string & file_name) {
     // Reserve space for y and offsets
     index.labels.resize(index.size, 0);
     index.offsets.resize(index.size + 1, 0);
+    index.norms.resize(index.size, 0);
 
     if (fread(index.labels.data(), sizeof(ffm_float), index.labels.size(), file) != index.labels.size())
-        throw runtime_error("Error reading y");
+        throw runtime_error("Error reading labels");
 
     if (fread(index.offsets.data(), sizeof(ffm_ulong), index.offsets.size(), file) != index.offsets.size())
         throw runtime_error("Error reading offsets");
+
+    if (fread(index.norms.data(), sizeof(ffm_float), index.norms.size(), file) != index.norms.size())
+        throw runtime_error("Error reading norms");
 
     fclose(file);
 

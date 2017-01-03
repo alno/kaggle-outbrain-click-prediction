@@ -8,7 +8,7 @@ CXXFLAGS += -fopenmp
 all: bin/export-vw-data bin/export-ffm-data bin/prepare-leak bin/prepare-similarity bin/ffm bin/export-ffm-data-2
 
 bin/%.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(DFLAG) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(DFLAG) -MMD -c -o $@ $<
 
 bin/%: bin/%.o bin/ffm-io.o
 	$(CXX) $(CXXFLAGS) -o $@ $< bin/ffm-io.o -lboost_iostreams -lboost_program_options
