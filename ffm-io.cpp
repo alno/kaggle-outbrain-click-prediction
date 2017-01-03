@@ -20,6 +20,9 @@ void ffm_write_index(const std::string & file_name, const ffm_index & index) {
     if (index.norms.size() != index.size)
         throw runtime_error("Invalid index norms size");
 
+    if (index.groups.size() != index.size)
+        throw runtime_error("Invalid index groups size");
+
     FILE * file = fopen(file_name.c_str(), "wb");
 
     if(file == nullptr)
@@ -36,6 +39,9 @@ void ffm_write_index(const std::string & file_name, const ffm_index & index) {
 
     if (fwrite(index.norms.data(), sizeof(ffm_float), index.norms.size(), file) != index.norms.size())
         throw runtime_error("Error writing norms");
+
+    if (fwrite(index.groups.data(), sizeof(ffm_uint), index.groups.size(), file) != index.groups.size())
+        throw runtime_error("Error writing groups");
 
     fclose(file);
 }
@@ -56,6 +62,7 @@ ffm_index ffm_read_index(const std::string & file_name) {
     index.labels.resize(index.size, 0);
     index.offsets.resize(index.size + 1, 0);
     index.norms.resize(index.size, 0);
+    index.groups.resize(index.size, 0);
 
     if (fread(index.labels.data(), sizeof(ffm_float), index.labels.size(), file) != index.labels.size())
         throw runtime_error("Error reading labels");
@@ -65,6 +72,9 @@ ffm_index ffm_read_index(const std::string & file_name) {
 
     if (fread(index.norms.data(), sizeof(ffm_float), index.norms.size(), file) != index.norms.size())
         throw runtime_error("Error reading norms");
+
+    if (fread(index.groups.data(), sizeof(ffm_uint), index.groups.size(), file) != index.groups.size())
+        throw runtime_error("Error reading groups");
 
     fclose(file);
 

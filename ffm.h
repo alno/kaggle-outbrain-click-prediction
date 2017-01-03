@@ -23,6 +23,7 @@ struct ffm_index {
     std::vector<ffm_float> labels; // Target values of examples (size N)
     std::vector<ffm_ulong> offsets; // Offsets of example data (size N +1) in number of features
     std::vector<ffm_float> norms; // Squares of l2 norm of examples (size N)
+    std::vector<ffm_uint> groups; // Group identifiers for MAP calculation
 };
 
 // IO functions

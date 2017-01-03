@@ -45,7 +45,7 @@ const ffm_ulong field_stride = n_dim * 2;
 std::default_random_engine rnd(2017);
 
 ffm_float eta = 0.2;
-ffm_float lambda = 0.00002;
+ffm_float lambda = 0.0001;
 
 
 template <typename T>
@@ -229,6 +229,55 @@ ffm_double train_on_dataset(const ffm_dataset & dataset) {
 }
 
 
+ffm_double compute_ap(const std::vector<ffm_float> & predictions, ffm_uint begin_idx, ffm_uint end_idx, ffm_uint positive_idx) {
+    ffm_uint rank = 0;
+
+    for (ffm_uint j = begin_idx; j < end_idx; ++ j)
+        if (predictions[j] >= predictions[positive_idx])
+            rank ++;
+
+    if (rank > 0 && rank <= 12)
+        return 1.0 / rank;
+    else
+        return 0.0;
+}
+
+
+ffm_double compute_map(const ffm_index & index, const std::vector<ffm_float> & predictions) {
+    ffm_double total = 0.0;
+    ffm_uint count = 0;
+
+    ffm_uint cur_group = 0;
+    ffm_uint cur_group_start_idx = 0;
+
+    ffm_uint positive_idx = index.size + 1;
+
+    for (ffm_uint i = 0; i < index.size; ++ i) {
+        if (index.groups[i] < cur_group)
+            throw std::logic_error("Groups must be ordered!");
+
+        if (index.groups[i] > cur_group) {
+            if (cur_group > 0) {
+                total += compute_ap(predictions, cur_group_start_idx, i, positive_idx);
+                count ++;
+            }
+
+            cur_group = index.groups[i];
+            cur_group_start_idx = i;
+            positive_idx = index.size + 1;
+        }
+
+        if (index.labels[i] > 0)
+            positive_idx = i;
+    }
+
+    total += compute_ap(predictions, cur_group_start_idx, index.size, positive_idx);
+    count ++;
+
+    return total / count;
+}
+
+
 ffm_double evaluate_on_dataset(const ffm_dataset & dataset) {
     clock_t begin = clock();
 
@@ -238,11 +287,13 @@ ffm_double evaluate_on_dataset(const ffm_dataset & dataset) {
     auto batches = generate_batches(dataset.index, false);
 
     ffm_double loss = 0.0;
-    ffm_ulong cnt = 0;
+    ffm_uint cnt = 0;
+
+    std::vector<ffm_float> predictions(dataset.index.size);
 
     // Iterate over batches, read each and then iterate over examples
     #pragma omp parallel for schedule(dynamic, 1) reduction(+: loss) reduction(+: cnt)
-    for (ffm_ulong bi = 0; bi < batches.size(); ++ bi) {
+    for (ffm_uint bi = 0; bi < batches.size(); ++ bi) {
         auto batch_start_index = batches[bi].first;
         auto batch_end_index = batches[bi].second;
 
@@ -263,15 +314,19 @@ ffm_double evaluate_on_dataset(const ffm_dataset & dataset) {
             ffm_float expnyt = exp(-y*t);
 
             loss += log(1+expnyt);
+            predictions[ei] = 1 / (1+exp(-t));
         }
 
         cnt += batch_end_index - batch_start_index;
     }
 
+    // Compute map metric
+    ffm_double map = compute_map(dataset.index, predictions);
+
     clock_t end = clock();
     double elapsed = double(end - begin) / CLOCKS_PER_SEC;
 
-    std::cout << cnt << " examples processed in " << elapsed << " seconds, loss = " << (loss / cnt) << std::endl;
+    std::cout << cnt << " examples processed in " << elapsed << " seconds, loss = " << (loss / cnt) << ", map = " << map << std::endl;
 
     return loss;
 }

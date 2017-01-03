@@ -203,6 +203,7 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     index.labels.push_back(rows[0].size() == 3 ? stof(rows[0][2]) * 2 - 1 : 0);
     index.offsets.push_back(offset);
     index.norms.push_back(norm(features));
+    index.groups.push_back(event_id);
 }
 
 
