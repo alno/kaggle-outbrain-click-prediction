@@ -82,6 +82,11 @@ std::pair<int, std::pair<int, float>> read_document_annotation(const std::vector
 }
 
 
+std::pair<int, int> read_count(const std::vector<std::string> & row) {
+    return std::make_pair(stoi(row[0]), stoi(row[1]));
+}
+
+
 std::vector<event> read_events() {
     return read_vector("cache/events.csv.gz", read_event, 23120127);
 }

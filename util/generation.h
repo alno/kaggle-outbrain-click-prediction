@@ -11,6 +11,8 @@ void generate_files(const D & data, const std::vector<std::pair<std::vector<std:
         auto in_file_name = it->first[0];
         auto out_file_name = it->second;
 
+        W writer(out_file_name);
+
         cout << "  Generating " << out_file_name << "... ";
         cout.flush();
 
@@ -20,8 +22,6 @@ void generate_files(const D & data, const std::vector<std::pair<std::vector<std:
 
         for (auto in_it = it->first.begin(); in_it != it->first.end(); ++in_it)
             in_files.push_back(unique_ptr<compressed_csv_file>(new compressed_csv_file(*in_it)));
-
-        W writer(out_file_name);
 
         for (int i = 0;; ++ i) {
             vector<vector<string>> rows;

@@ -43,6 +43,9 @@ public:
         in.push(boost::iostreams::file_source(name, std::ios_base::in | std::ios_base::binary), buffer_size, buffer_size);
 
         header = getrow();
+
+        if (!in)
+            throw std::runtime_error(std::string("Can't open file ") + name);
     }
 
     std::string getline() {
@@ -102,7 +105,7 @@ void read_vector(std::vector<T> & res, const std::string & file_name, std::pair<
 
     clock_t begin = clock();
 
-    cout << "  Loading " << boost::typeindex::type_id<T>().pretty_name() << "s... ";
+    cout << "  Loading " << boost::typeindex::type_id<T>().pretty_name() << "s from " << file_name << "... ";
     cout.flush();
 
     compressed_csv_file file(file_name);
@@ -147,7 +150,7 @@ std::unordered_multimap<K, T> read_multi_map(const std::string & file_name, std:
 
     clock_t begin = clock();
 
-    cout << "  Loading " << boost::typeindex::type_id<T>().pretty_name() << "s... ";
+    cout << "  Loading " << boost::typeindex::type_id<T>().pretty_name() << "s from " << file_name << "... ";
     cout.flush();
 
     compressed_csv_file file(file_name);
@@ -182,7 +185,7 @@ void read_sorted_vector_map(std::unordered_map<K, std::vector<T>> & res, const s
 
     clock_t begin = clock();
 
-    cout << "  Loading " << boost::typeindex::type_id<T>().pretty_name() << "s... ";
+    cout << "  Loading " << boost::typeindex::type_id<T>().pretty_name() << "s from " << file_name << "... ";
     cout.flush();
 
     compressed_csv_file file(file_name);

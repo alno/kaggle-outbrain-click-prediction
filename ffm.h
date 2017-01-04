@@ -10,8 +10,12 @@ typedef uint64_t ffm_ulong;
 typedef float ffm_float;
 typedef double ffm_double;
 
+
+const ffm_uint ffm_hash_bits = 20;
+const ffm_uint ffm_hash_mask = (1 << ffm_hash_bits) - 1;
+
+
 struct ffm_feature {
-    ffm_uint field;
     ffm_uint index;
     ffm_float value;
 };

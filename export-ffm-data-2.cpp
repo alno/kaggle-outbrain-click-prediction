@@ -16,47 +16,29 @@ std::vector<std::pair<std::vector<std::string>, std::string>> filesets = {
 
 std::hash<std::string> str_hash;
 
-uint32_t hash_offset = 100;
-uint32_t hash_base = 1 << 19;
-
-uint32_t max_index = 0;
-uint32_t max_field = 0;
-
-uint32_t h(uint32_t a, uint32_t f) {
-    a = a + f * 2654435761;
+uint32_t h(uint32_t a) {
     a = (a ^ 61) ^ (a >> 16);
     a = a + (a << 3);
     a = a ^ (a >> 4);
     a = a * 0x27d4eb2d;
     a = a ^ (a >> 15);
-    return (a % hash_base) + hash_offset;
-}
-
-uint32_t h(const std::string & a, uint32_t f) {
-    return (((str_hash(a) + f) * 2654435761) % hash_base) + hash_offset;
+    return a;
 }
 
 ffm_feature feature_raw(uint32_t field, uint32_t index, float value = 1.0) {
     ffm_feature f;
-    f.field = field;
-    f.index = index;
+    f.index = (field << ffm_hash_bits) | (index & ffm_hash_mask);
     f.value = value;
-
-    if (index > max_index)
-        max_index = index;
-
-    if (field > max_field)
-        max_field = field;
 
     return f;
 }
 
 ffm_feature feature_hashed(uint32_t field, uint32_t category, float value = 1.0) {
-    return feature_raw(field, h(category, field), value);
+    return feature_raw(field, h(category + field * 2654435761), value);
 }
 
 ffm_feature feature_hashed(uint32_t field, const std::string & category, float value = 1.0) {
-    return feature_raw(field, h(category, field), value);
+    return feature_raw(field, h(str_hash(category) + field * 2654435761), value);
 }
 
 inline float pos_time_diff(int64_t td) {
@@ -83,6 +65,26 @@ ffm_float norm(const std::vector<ffm_feature> & features) {
 }
 
 
+std::string cur_dataset;
+
+std::unordered_map<int, int> ad_counts;
+std::unordered_map<int, int> ad_doc_counts;
+std::unordered_map<int, int> ev_doc_counts;
+
+
+void load_dataset_data(const std::string & dataset) {
+    if (cur_dataset == dataset)
+        return;
+
+    cur_dataset = dataset;
+    std::cout << "Loading " << dataset << " data..." << std::endl;
+
+    ad_counts = read_map(std::string("cache/ad_counts_") + dataset + std::string(".csv.gz"), read_count);
+    ad_doc_counts = read_map(std::string("cache/ad_doc_counts_") + dataset + std::string(".csv.gz"), read_count);
+    ev_doc_counts = read_map(std::string("cache/ev_doc_counts_") + dataset + std::string(".csv.gz"), read_count);
+}
+
+
 class writer {
     std::string file_name;
 
@@ -92,6 +94,8 @@ public:
     writer(const std::string & file_name): file_name(file_name), data_out(file_name + ".data") {
         index.size = 0;
         index.offsets.push_back(0);
+
+        load_dataset_data(file_name.substr(6, file_name.find("_") - 6));
     }
 
     void write(const reference_data & data, const std::vector<std::vector<std::string>> & rows);
@@ -121,12 +125,17 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     //auto ev_doc_topics = data.document_topics.equal_range(event.document_id);
     //auto ev_doc_entities = data.document_entities.equal_range(event.document_id);
 
+    // Get counts
+    auto ad_count = ad_counts.at(ad_id);
+    auto ad_doc_count = ad_doc_counts.at(ad.document_id);
+    auto ev_doc_count = ev_doc_counts.at(event.document_id);
+
     // Start building line
     //line_builder line(label);
     std::vector<ffm_feature> features;
 
 
-    features.push_back(feature_hashed(0, ad_id));
+    features.push_back(feature_hashed(0, ad_count < 50 ? ad_count : ad_id + 100));
     features.push_back(feature_hashed(1, ad.campaign_id));
     features.push_back(feature_hashed(2, ad.advertiser_id));
 
@@ -135,35 +144,33 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     features.push_back(feature_hashed(5, event.state));
 
     // Document info
-    features.push_back(feature_hashed(6, event.document_id));
+    features.push_back(feature_hashed(6, ev_doc_count < 50 ? ev_doc_count : event.document_id + 100));
     features.push_back(feature_hashed(7, ev_doc.source_id));
     features.push_back(feature_hashed(8, ev_doc.publisher_id));
 
     for (auto it = ev_doc_categories.first; it != ev_doc_categories.second; ++ it)
         features.push_back(feature_hashed(12, it->second.first, it->second.second));
-
     /*
     for (auto it = ev_doc_topics.first; it != ev_doc_topics.second; ++ it)
-        line.feature_hashed(14, it->second.first, it->second.second);
+        features.push_back(feature_hashed(14, it->second.first, it->second.second));
 
     for (auto it = ev_doc_entities.first; it != ev_doc_entities.second; ++ it)
-        line.feature_hashed(16, it->second.first, it->second.second);
+        features.push_back(feature_hashed(16, it->second.first, it->second.second));
     */
 
     // Promoted document info
-    features.push_back(feature_hashed(9, ad.document_id));
+    features.push_back(feature_hashed(9, ad_doc_count < 50 ? ad_doc_count : ad.document_id + 100));
     features.push_back(feature_hashed(10, ad_doc.source_id));
     features.push_back(feature_hashed(11, ad_doc.publisher_id));
 
     for (auto it = ad_doc_categories.first; it != ad_doc_categories.second; ++ it)
         features.push_back(feature_hashed(13, it->second.first, it->second.second));
-
     /*
     for (auto it = ad_doc_topics.first; it != ad_doc_topics.second; ++ it)
-        line.feature(15, it->second.first, it->second.second);
+        features.push_back(feature_hashed(15, it->second.first, it->second.second));
 
     for (auto it = ad_doc_entities.first; it != ad_doc_entities.second; ++ it)
-        line.feature(17, it->second.first, it->second.second);
+        features.push_back(feature_hashed(17, it->second.first, it->second.second));
     */
 
     //
@@ -191,7 +198,7 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     for (uint i = 0; i < rows[2].size(); ++ i)
         if (stof(rows[2][i]) > 0)
             features.push_back(feature_raw(26 + i, 6 + i, stof(rows[2][i])));
-*/
+    */
     // TODO Category, topic and entity intersection
     // TODO Doc timestamp diff
 
@@ -220,9 +227,6 @@ int main() {
 
     cout << "Generating files..." << endl;
     generate_files<reference_data, writer>(data, filesets);
-
-    cout << "Max field: " << max_field << endl;
-    cout << "Max index: " << max_index << endl;
 
     cout << "Done." << endl;
 }

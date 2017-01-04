@@ -32,8 +32,10 @@ ffm_uint batch_size = 10000;
 ffm_uint mini_batch_size = 32;
 ffm_uint n_threads = 4;
 
-const ffm_ulong n_features = (1 << 19) + 100;
+
 const ffm_ulong n_fields = 30;
+
+const ffm_ulong n_features = 1 << ffm_hash_bits;
 const ffm_ulong n_dim = 4;
 
 
@@ -63,14 +65,17 @@ ffm_float predict(const ffm_feature * start, const ffm_feature * end, ffm_float 
     __m128 xmm_total = _mm_setzero_ps();
 
     for (const ffm_feature * fa = start; fa != end; ++ fa) {
-        ffm_uint field_a = fa->field;
-        ffm_uint index_a = fa->index;
+        ffm_uint index_a = fa->index &  ffm_hash_mask;
+        ffm_uint field_a = fa->index >> ffm_hash_bits;
         ffm_float value_a = fa->value;
 
         for (const ffm_feature * fb = fa + 1; fb != end; ++ fb) {
-            ffm_uint field_b = fb->field;
-            ffm_uint index_b = fb->index;
+            ffm_uint index_b = fb->index &  ffm_hash_mask;
+            ffm_uint field_b = fb->index >> ffm_hash_bits;
             ffm_float value_b = fb->value;
+
+            //if (field_a == field_b)
+            //    continue;
 
             ffm_float * wa = weights + index_a * index_stride + field_b * field_stride;
             ffm_float * wb = weights + index_b * index_stride + field_a * field_stride;
@@ -102,14 +107,17 @@ void update(const ffm_feature * start, const ffm_feature * end, ffm_float norm, 
     __m128 xmm_lambda = _mm_set1_ps(lambda);
 
     for (const ffm_feature * fa = start; fa != end; ++ fa) {
-        ffm_uint field_a = fa->field;
-        ffm_uint index_a = fa->index;
+        ffm_uint index_a = fa->index &  ffm_hash_mask;
+        ffm_uint field_a = fa->index >> ffm_hash_bits;
         ffm_float value_a = fa->value;
 
         for (const ffm_feature * fb = fa + 1; fb != end; ++ fb) {
-            ffm_uint field_b = fb->field;
-            ffm_uint index_b = fb->index;
+            ffm_uint index_b = fb->index &  ffm_hash_mask;
+            ffm_uint field_b = fb->index >> ffm_hash_bits;
             ffm_float value_b = fb->value;
+
+            //if (field_a == field_b)
+            //    continue;
 
             ffm_float * wa = weights + index_a * index_stride + field_b * field_stride;
             ffm_float * wb = weights + index_b * index_stride + field_a * field_stride;
@@ -374,23 +382,24 @@ void predict_on_dataset(const ffm_dataset & dataset, std::ostream & out) {
 }
 
 
+template <typename D>
+void init_weights(ffm_float * weights, ffm_uint n, D gen) {
+    ffm_float * w = weights;
+
+    for(ffm_uint i = 0; i < n; i++) {
+        for(ffm_uint d = 0; d < n_dim; d++, w++)
+            *w = gen(rnd);
+
+        for(ffm_uint d = n_dim; d < 2*n_dim; d++, w++)
+            *w = 1;
+    }
+}
+
+
 void init_model() {
     weights = malloc_aligned_float(n_features * n_fields * n_dim * 2);
 
-    std::uniform_real_distribution<ffm_float> distribution(0.0, 1.0);
-
-    ffm_float * w = weights;
-    ffm_float coef = 1.0f / sqrt(n_dim);
-
-    for(ffm_uint j = 0; j < n_features; j++) {
-        for(ffm_uint f = 0; f < n_fields; f++) {
-            for(ffm_uint d = 0; d < n_dim; d++, w++)
-                *w = coef * distribution(rnd);
-
-            for(ffm_uint d = n_dim; d < 2*n_dim; d++, w++)
-                *w = 1;
-        }
-    }
+    init_weights(weights, n_features * n_fields, std::uniform_real_distribution<ffm_float>(0.0, 1.0/sqrt(n_dim)));
 }
 
 

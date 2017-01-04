@@ -36,6 +36,8 @@ int main() {
 
     for (auto it = filesets.begin(); it != filesets.end(); ++ it) {
         unordered_map<int, uint32_t> ad_counts;
+        unordered_map<int, uint32_t> ad_campaign_counts;
+        unordered_map<int, uint32_t> ad_advertiser_counts;
         unordered_map<int, uint32_t> ad_doc_counts;
         unordered_map<int, uint32_t> ev_doc_counts;
 
@@ -70,6 +72,8 @@ int main() {
 
                 // Increment counters
                 ++ ad_counts[ad_id];
+                ++ ad_campaign_counts[ad.campaign_id];
+                ++ ad_advertiser_counts[ad.advertiser_id];
                 ++ ad_doc_counts[ad.document_id];
                 ++ ev_doc_counts[ev.document_id];
             }
@@ -81,6 +85,8 @@ int main() {
         }
 
         write_counts(ad_counts, string("cache/ad_counts_") + it->first + string(".csv.gz"));
+        write_counts(ad_campaign_counts, string("cache/ad_campaign_counts_") + it->first + string(".csv.gz"));
+        write_counts(ad_advertiser_counts, string("cache/ad_advertiser_counts_") + it->first + string(".csv.gz"));
         write_counts(ad_doc_counts, string("cache/ad_doc_counts_") + it->first + string(".csv.gz"));
         write_counts(ev_doc_counts, string("cache/ev_doc_counts_") + it->first + string(".csv.gz"));
     }
