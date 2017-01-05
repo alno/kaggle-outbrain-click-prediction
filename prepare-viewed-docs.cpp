@@ -153,7 +153,7 @@ int main() {
 
         std::ostream out(&buf);
 
-        out << "publisher_views,source_views" << endl;
+        out << "publisher_view_count,source_view_count" << endl;
 
         for (int i = 0;; ++i) {
             auto row = file.getrow();
