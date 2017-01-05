@@ -8,10 +8,10 @@
 #include <cmath>
 
 std::vector<std::pair<std::vector<std::string>, std::string>> filesets = {
-    { { "cache/clicks_val_train.csv.gz", "cache/leak_val_train.csv.gz", "cache/viewed_docs_val_train.csv.gz" }, "cache/val_train_ffm_2" },
-    { { "cache/clicks_val_test.csv.gz", "cache/leak_val_test.csv.gz", "cache/viewed_docs_val_test.csv.gz" }, "cache/val_test_ffm_2" },
-    { { "../input/clicks_train.csv.gz", "cache/leak_full_train.csv.gz", "cache/viewed_docs_full_train.csv.gz" }, "cache/full_train_ffm_2" },
-    { { "../input/clicks_test.csv.gz", "cache/leak_full_test.csv.gz", "cache/viewed_docs_full_test.csv.gz" }, "cache/full_test_ffm_2" },
+    { { "cache/clicks_val_train.csv.gz", "cache/leak_val_train.csv.gz", "cache/viewed_docs_val_train.csv.gz", "cache/viewed_ads_val_train.csv.gz" }, "cache/val_train_ffm_2" },
+    { { "cache/clicks_val_test.csv.gz", "cache/leak_val_test.csv.gz", "cache/viewed_docs_val_test.csv.gz", "cache/viewed_ads_val_test.csv.gz" }, "cache/val_test_ffm_2" },
+    { { "../input/clicks_train.csv.gz", "cache/leak_full_train.csv.gz", "cache/viewed_docs_full_train.csv.gz", "cache/viewed_ads_full_train.csv.gz" }, "cache/full_train_ffm_2" },
+    { { "../input/clicks_test.csv.gz", "cache/leak_full_test.csv.gz", "cache/viewed_docs_full_test.csv.gz", "cache/viewed_ads_full_test.csv.gz" }, "cache/full_test_ffm_2" },
 };
 
 std::hash<std::string> str_hash;
@@ -207,11 +207,19 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     if (stoi(rows[2][1]) > 0)
         features.push_back(feature_raw(11, 5)); // Viewed documents of same source
 
+    // Ad view features
+
+    if (stoi(rows[3][0]) > 0)
+        features.push_back(feature_raw(11, 6)); // Viewed this ad earlier
+
+    if (stoi(rows[3][1]) > 0)
+        features.push_back(feature_raw(11, 7)); // Clicked this ad earlier
+
     features.push_back(feature_raw(12, event.weekday + 50));
     features.push_back(feature_raw(12, event.hour + 70));
 
-    features.push_back(feature_raw(13, 4, pos_time_diff(event.timestamp - ad_doc.publish_timestamp)));
-    features.push_back(feature_raw(14, 5, time_diff(ev_doc.publish_timestamp - ad_doc.publish_timestamp)));
+    features.push_back(feature_raw(13, 80, pos_time_diff(event.timestamp - ad_doc.publish_timestamp)));
+    features.push_back(feature_raw(14, 81, time_diff(ev_doc.publish_timestamp - ad_doc.publish_timestamp)));
 
     // Similarity features
     /*
