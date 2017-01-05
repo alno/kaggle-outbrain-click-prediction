@@ -26,12 +26,4 @@ train[train_is_val].to_csv(val_split[1], index=True, compression='gzip')
 
 del train
 
-print "Splitting similarity..."
-
-similarity = pd.read_csv('cache/similarity_full_train.csv.gz')
-similarity[~train_is_val].to_csv('cache/similarity_val_train.csv.gz', index=False, compression='gzip')
-similarity[train_is_val].to_csv('cache/similarity_val_test.csv.gz', index=False, compression='gzip')
-
-del similarity
-
 print "Done."
