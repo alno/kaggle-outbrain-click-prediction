@@ -8,10 +8,10 @@
 #include <cmath>
 
 std::vector<std::pair<std::vector<std::string>, std::string>> filesets = {
-    { { "cache/clicks_val_train.csv.gz", "cache/leak_val_train.csv.gz", "cache/similarity_val_train.csv.gz" }, "cache/val_train_ffm_2" },
-    { { "cache/clicks_val_test.csv.gz", "cache/leak_val_test.csv.gz", "cache/similarity_val_test.csv.gz" }, "cache/val_test_ffm_2" },
-    { { "../input/clicks_train.csv.gz", "cache/leak_full_train.csv.gz", "cache/similarity_full_train.csv.gz" }, "cache/full_train_ffm_2" },
-    { { "../input/clicks_test.csv.gz", "cache/leak_full_test.csv.gz", "cache/similarity_full_test.csv.gz" }, "cache/full_test_ffm_2" },
+    { { "cache/clicks_val_train.csv.gz", "cache/leak_val_train.csv.gz", "cache/viewed_docs_val_train.csv.gz" }, "cache/val_train_ffm_2" },
+    { { "cache/clicks_val_test.csv.gz", "cache/leak_val_test.csv.gz", "cache/viewed_docs_val_test.csv.gz" }, "cache/val_test_ffm_2" },
+    { { "../input/clicks_train.csv.gz", "cache/leak_full_train.csv.gz", "cache/viewed_docs_full_train.csv.gz" }, "cache/full_train_ffm_2" },
+    { { "../input/clicks_test.csv.gz", "cache/leak_full_test.csv.gz", "cache/viewed_docs_full_test.csv.gz" }, "cache/full_test_ffm_2" },
 };
 
 std::hash<std::string> str_hash;
@@ -126,9 +126,6 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     int event_id = stoi(rows[0][0]);
     int ad_id = stoi(rows[0][1]);
 
-    int leak_viewed = stoi(rows[1][0]);
-    int leak_not_viewed = stoi(rows[1][1]);
-
     //
 
     auto ad = data.ads[ad_id];
@@ -162,24 +159,20 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     // Start building line
     std::vector<ffm_feature> features;
 
-
-    features.push_back(feature_hashed(0, ad_count < 50 ? ad_count : ad_id + 100));
-    features.push_back(feature_hashed(1, ad_campaign_count < 50 ? ad_campaign_count : ad.campaign_id + 100));
-    features.push_back(feature_hashed(2, ad_advertiser_count < 50 ? ad_advertiser_count : ad.advertiser_id + 100));
-
-    features.push_back(feature_hashed(3, event.platform));
-    features.push_back(feature_hashed(4, event.country));
-    features.push_back(feature_hashed(5, event.state));
-    //features.push_back(feature_hashed(18, event.region));
-    features.push_back(feature_hashed(18, uid_count < 50 ? uid_count : event.uid + 100));
+    // Event features
+    features.push_back(feature_hashed(0, event.platform));
+    features.push_back(feature_hashed(1, event.country));
+    features.push_back(feature_hashed(2, event.state));
+    //features.push_back(feature_hashed(, event.region));
+    features.push_back(feature_hashed(3, uid_count < 50 ? uid_count : event.uid + 100));
 
     // Document info
-    features.push_back(feature_hashed(6, ev_doc_count < 50 ? ev_doc_count : event.document_id + 100));
-    features.push_back(feature_hashed(7, ev_doc_source_count < 10 ? ev_doc_source_count : ev_doc.source_id + 10));
-    features.push_back(feature_hashed(8, ev_doc_publisher_count < 10 ? ev_doc_publisher_count : ev_doc.publisher_id + 10));
+    features.push_back(feature_hashed(4, ev_doc_count < 50 ? ev_doc_count : event.document_id + 100));
+    features.push_back(feature_hashed(5, ev_doc_source_count < 10 ? ev_doc_source_count : ev_doc.source_id + 10));
+    features.push_back(feature_hashed(6, ev_doc_publisher_count < 10 ? ev_doc_publisher_count : ev_doc.publisher_id + 10));
 
     for (auto it = ev_doc_categories.first; it != ev_doc_categories.second; ++ it)
-        features.push_back(feature_hashed(12, it->second.first, it->second.second));
+        features.push_back(feature_hashed(7, it->second.first, it->second.second));
     /*
     for (auto it = ev_doc_topics.first; it != ev_doc_topics.second; ++ it)
         features.push_back(feature_hashed(14, it->second.first, it->second.second));
@@ -188,42 +181,37 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
         features.push_back(feature_hashed(16, it->second.first, it->second.second));
     */
 
-    // Promoted document info
-    features.push_back(feature_hashed(9, ad_doc_count < 50 ? ad_doc_count : ad.document_id + 100));
-    features.push_back(feature_hashed(10, ad_doc_source_count < 10 ? ad_doc_source_count : ad_doc.source_id + 10));
-    features.push_back(feature_hashed(11, ad_doc_publisher_count < 10 ? ad_doc_publisher_count : ad_doc.publisher_id + 10));
-
-    for (auto it = ad_doc_categories.first; it != ad_doc_categories.second; ++ it)
-        features.push_back(feature_hashed(13, it->second.first, it->second.second));
-    /*
-    for (auto it = ad_doc_topics.first; it != ad_doc_topics.second; ++ it)
-        features.push_back(feature_hashed(15, it->second.first, it->second.second));
-
-    for (auto it = ad_doc_entities.first; it != ad_doc_entities.second; ++ it)
-        features.push_back(feature_hashed(17, it->second.first, it->second.second));
-    */
+    // Common features
 
     // Same feature markers
 
     if (ad_doc.publisher_id == ev_doc.publisher_id)
-        features.push_back(feature_raw(20, 0)); // Same publisher
+        features.push_back(feature_raw(10, 0)); // Same publisher
 
     if (ad_doc.source_id == ev_doc.source_id)
-        features.push_back(feature_raw(20, 1)); // Same source
+        features.push_back(feature_raw(10, 1)); // Same source
 
     // Leak features
 
-    if (leak_viewed > 0)
-        features.push_back(feature_raw(21, 2)); // Viewed
+    if (stoi(rows[1][0]) > 0)
+        features.push_back(feature_raw(11, 2)); // Viewed
 
-    if (leak_not_viewed > 0)
-        features.push_back(feature_raw(21, 3)); // Not viewed
+    if (stoi(rows[1][1]) > 0)
+        features.push_back(feature_raw(11, 3)); // Not viewed
 
-    features.push_back(feature_raw(22, event.weekday + 50));
-    features.push_back(feature_raw(22, event.hour + 70));
+    // Document view features
 
-    features.push_back(feature_raw(24, 4, pos_time_diff(event.timestamp - ad_doc.publish_timestamp)));
-    features.push_back(feature_raw(25, 5, time_diff(ev_doc.publish_timestamp - ad_doc.publish_timestamp)));
+    if (stoi(rows[2][0]) > 0)
+        features.push_back(feature_raw(11, 4)); // Viewed documents of same publisher
+
+    if (stoi(rows[2][1]) > 0)
+        features.push_back(feature_raw(11, 5)); // Viewed documents of same source
+
+    features.push_back(feature_raw(12, event.weekday + 50));
+    features.push_back(feature_raw(12, event.hour + 70));
+
+    features.push_back(feature_raw(13, 4, pos_time_diff(event.timestamp - ad_doc.publish_timestamp)));
+    features.push_back(feature_raw(14, 5, time_diff(ev_doc.publish_timestamp - ad_doc.publish_timestamp)));
 
     // Similarity features
     /*
@@ -231,8 +219,26 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
         if (stof(rows[2][i]) > 0)
             features.push_back(feature_raw(26 + i, 6 + i, stof(rows[2][i])));
     */
-    // TODO Category, topic and entity intersection
-    // TODO Doc timestamp diff
+
+    // Ad features
+    features.push_back(feature_hashed(20, ad_count < 50 ? ad_count : ad_id + 100));
+    features.push_back(feature_hashed(21, ad_campaign_count < 50 ? ad_campaign_count : ad.campaign_id + 100));
+    features.push_back(feature_hashed(22, ad_advertiser_count < 50 ? ad_advertiser_count : ad.advertiser_id + 100));
+
+    // Promoted document info
+    features.push_back(feature_hashed(23, ad_doc_count < 50 ? ad_doc_count : ad.document_id + 100));
+    features.push_back(feature_hashed(24, ad_doc_source_count < 10 ? ad_doc_source_count : ad_doc.source_id + 10));
+    features.push_back(feature_hashed(25, ad_doc_publisher_count < 10 ? ad_doc_publisher_count : ad_doc.publisher_id + 10));
+
+    for (auto it = ad_doc_categories.first; it != ad_doc_categories.second; ++ it)
+        features.push_back(feature_hashed(26, it->second.first, it->second.second));
+    /*
+    for (auto it = ad_doc_topics.first; it != ad_doc_topics.second; ++ it)
+        features.push_back(feature_hashed(15, it->second.first, it->second.second));
+
+    for (auto it = ad_doc_entities.first; it != ad_doc_entities.second; ++ it)
+        features.push_back(feature_hashed(17, it->second.first, it->second.second));
+    */
 
     // Write data
     auto offset = data_out.write(features);
