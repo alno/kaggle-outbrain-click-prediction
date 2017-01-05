@@ -27,11 +27,7 @@ def fit_predict(profile, split, split_name):
 
 profiles = {
     'p1': {
-        'options': "--epochs 3",
-    },
-
-    'p0': {
-        'options': "--epochs 20",
+        'options': "--epochs 5",
     },
 }
 

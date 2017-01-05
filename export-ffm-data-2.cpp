@@ -207,13 +207,19 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     if (stoi(rows[2][1]) > 0)
         features.push_back(feature_raw(11, 5)); // Viewed documents of same source
 
-    // Ad view features
+    // Ad view/click features
 
     if (stoi(rows[3][0]) > 0)
         features.push_back(feature_raw(11, 6)); // Viewed this ad earlier
 
     if (stoi(rows[3][1]) > 0)
         features.push_back(feature_raw(11, 7)); // Clicked this ad earlier
+
+    if (stoi(rows[3][2]) > 0)
+        features.push_back(feature_raw(11, 8)); // Viewed this ad doc earlier
+
+    if (stoi(rows[3][3]) > 0)
+        features.push_back(feature_raw(11, 9)); // Clicked this ad doc earlier
 
     features.push_back(feature_raw(12, event.weekday + 50));
     features.push_back(feature_raw(12, event.hour + 70));
