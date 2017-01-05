@@ -70,7 +70,7 @@ std::unordered_map<K, T> read_map(const std::string & file_name, std::pair<K, T>
 
     clock_t begin = clock();
 
-    cout << "  Loading " << boost::typeindex::type_id<T>().pretty_name() << "s... ";
+    cout << "  Loading " << boost::typeindex::type_id<T>().pretty_name() << "s from " << file_name << "... ";
     cout.flush();
 
     compressed_csv_file file(file_name);
