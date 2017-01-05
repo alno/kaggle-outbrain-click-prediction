@@ -119,3 +119,16 @@ reference_data load_reference_data() {
 
     return res;
 }
+
+
+// Small util
+
+
+namespace std {
+    template <typename A, typename B>
+    struct hash<std::pair<A, B>> {
+        std::size_t operator()(const std::pair<A, B>& k) const {
+          return std::hash<A>()(k.first) ^ (std::hash<B>()(k.second) >> 1);
+        }
+    };
+}

@@ -2,17 +2,6 @@
 #include "util/data.h"
 
 
-namespace std {
-    template <typename A, typename B>
-    struct hash<std::pair<A, B>> {
-        std::size_t operator()(const std::pair<A, B>& k) const {
-          return std::hash<A>()(k.first) ^ (std::hash<B>()(k.second) >> 1);
-        }
-    };
-}
-
-//
-
 std::vector<std::pair<std::string, std::string>> filesets {
     std::make_pair("cache/clicks_val_train.csv.gz", "cache/viewed_docs_val_train.csv.gz"),
     std::make_pair("cache/clicks_val_test.csv.gz", "cache/viewed_docs_val_test.csv.gz"),
