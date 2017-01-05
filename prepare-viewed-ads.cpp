@@ -24,6 +24,8 @@ std::pair<int, int> read_ad_document(const std::vector<std::string> & row) {
 std::vector<int> event_uids;
 std::vector<int> ad_doc_ids;
 std::unordered_map<int, document> documents;
+std::unordered_multimap<int, std::pair<int, float>> document_categories;
+std::unordered_multimap<int, std::pair<int, float>> document_topics;
 
 
 class basic_writer {
@@ -35,7 +37,7 @@ public:
         return "ad_view_count,ad_click_count,ad_doc_view_count,ad_doc_click_count";
     }
 
-    void process_row(std::ostream & out, int event_id, int ad_id, bool clicked) {
+    void write(std::ostream & out, int event_id, int ad_id) {
         using namespace std;
 
         auto uid = event_uids[event_id];
@@ -49,6 +51,18 @@ public:
             << int(ad_cnt.second) << ","
             << int(ad_doc_cnt.first) << ","
             << int(ad_doc_cnt.second) << endl;
+    }
+
+
+    void update(int event_id, int ad_id, int clicked) {
+        using namespace std;
+
+        auto uid = event_uids[event_id];
+
+        auto doc_id = ad_doc_ids.at(ad_id);
+
+        auto & ad_cnt = ad_counts[make_pair(uid, ad_id)];
+        auto & ad_doc_cnt = ad_doc_counts[make_pair(uid, doc_id)];
 
         if (int(ad_cnt.first) > 250 || int(ad_doc_cnt.first) > 250)
             throw std::logic_error("Overflow is near");
@@ -56,7 +70,7 @@ public:
         ++ ad_cnt.first;
         ++ ad_doc_cnt.first;
 
-        if (clicked) {
+        if (clicked > 0) {
             ++ ad_cnt.second;
             ++ ad_doc_cnt.second;
         }
@@ -74,7 +88,7 @@ public:
         return "ad_publisher_view_count,ad_publisher_click_count,ad_source_view_count,ad_source_click_count";
     }
 
-    void process_row(std::ostream & out, int event_id, int ad_id, bool clicked) {
+    void write(std::ostream & out, int event_id, int ad_id) {
         using namespace std;
 
         auto uid = event_uids[event_id];
@@ -89,6 +103,18 @@ public:
             << int(ad_pub_cnt.second) << ","
             << int(ad_src_cnt.first) << ","
             << int(ad_src_cnt.second) << endl;
+    }
+
+    void update(int event_id, int ad_id, int clicked) {
+        using namespace std;
+
+        auto uid = event_uids[event_id];
+
+        auto doc_id = ad_doc_ids.at(ad_id);
+        auto doc = documents.at(doc_id);
+
+        auto & ad_pub_cnt = ad_pub_counts[make_pair(uid, doc.publisher_id)];
+        auto & ad_src_cnt = ad_src_counts[make_pair(uid, doc.source_id)];
 
         if (int(ad_pub_cnt.first) > 250 || int(ad_src_cnt.first) > 250)
             throw std::logic_error("Overflow is near");
@@ -96,13 +122,165 @@ public:
         ++ ad_pub_cnt.first;
         ++ ad_src_cnt.first;
 
-        if (clicked) {
+        if (clicked > 0) {
             ++ ad_pub_cnt.second;
             ++ ad_src_cnt.second;
         }
     }
 
 };
+
+
+class source_ctr_writer {
+    std::unordered_map<std::pair<int, int>, std::pair<uint8_t, uint8_t>> ad_pub_counts;
+    std::unordered_map<std::pair<int, int>, std::pair<uint8_t, uint8_t>> ad_src_counts;
+public:
+
+    std::string get_header() {
+        return "ad_publisher_ctr,ad_source_ctr";
+    }
+
+    void write(std::ostream & out, int event_id, int ad_id) {
+        using namespace std;
+
+        auto uid = event_uids[event_id];
+
+        auto doc_id = ad_doc_ids.at(ad_id);
+        auto doc = documents.at(doc_id);
+
+        auto & ad_pub_cnt = ad_pub_counts[make_pair(uid, doc.publisher_id)];
+        auto & ad_src_cnt = ad_src_counts[make_pair(uid, doc.source_id)];
+
+        const float reg_n = 5;
+        const float reg_p = 0.194;
+
+        float ad_pub_ctr = (ad_pub_cnt.second + reg_p * reg_n) / (ad_pub_cnt.first + reg_n);
+        float ad_src_ctr = (ad_src_cnt.second + reg_p * reg_n) / (ad_src_cnt.first + reg_n);
+
+        out << ad_pub_ctr << ","
+            << ad_src_ctr << endl;
+    }
+
+    void update(int event_id, int ad_id, int clicked) {
+        using namespace std;
+
+        auto uid = event_uids[event_id];
+
+        auto doc_id = ad_doc_ids.at(ad_id);
+        auto doc = documents.at(doc_id);
+
+        auto & ad_pub_cnt = ad_pub_counts[make_pair(uid, doc.publisher_id)];
+        auto & ad_src_cnt = ad_src_counts[make_pair(uid, doc.source_id)];
+
+        if (int(ad_pub_cnt.first) > 250 || int(ad_src_cnt.first) > 250)
+            throw std::logic_error("Overflow is near");
+
+        if (clicked >= 0) {
+            ++ ad_pub_cnt.first;
+            ++ ad_src_cnt.first;
+        }
+
+        if (clicked > 0) {
+            ++ ad_pub_cnt.second;
+            ++ ad_src_cnt.second;
+        }
+    }
+
+};
+
+
+
+class theme_writer {
+    std::unordered_map<std::pair<int, int>, std::pair<float, float>> ad_cat_counts;
+    std::unordered_map<std::pair<int, int>, std::pair<float, float>> ad_top_counts;
+public:
+
+    std::string get_header() {
+        return "ad_category_view_weight,ad_category_click_weight,ad_topic_view_weight,ad_topic_click_weight";
+    }
+
+    void write(std::ostream & out, int event_id, int ad_id) {
+        using namespace std;
+
+        auto uid = event_uids[event_id];
+
+        auto doc_id = ad_doc_ids.at(ad_id);
+
+        auto doc_categories = document_categories.equal_range(doc_id);
+        auto doc_topics = document_topics.equal_range(doc_id);
+
+        float cat_view_weight = 0;
+        float cat_click_weight = 0;
+
+        for (auto it = doc_categories.first; it != doc_categories.second; ++ it) {
+            auto & ad_cat_cnt = ad_cat_counts[make_pair(uid, it->second.first)];
+
+            cat_view_weight += ad_cat_cnt.first * it->second.second;
+            cat_click_weight += ad_cat_cnt.second * it->second.second;
+        }
+
+        float top_view_weight = 0;
+        float top_click_weight = 0;
+
+        for (auto it = doc_topics.first; it != doc_topics.second; ++ it) {
+            auto & ad_top_cnt = ad_top_counts[make_pair(uid, it->second.first)];
+
+            top_view_weight += ad_top_cnt.first * it->second.second;
+            top_click_weight += ad_top_cnt.second * it->second.second;
+        }
+
+        out << cat_view_weight << ","
+            << cat_click_weight << ","
+            << top_view_weight << ","
+            << top_click_weight << endl;
+    }
+
+    void update(int event_id, int ad_id, int clicked) {
+        using namespace std;
+
+        auto uid = event_uids[event_id];
+
+        auto doc_id = ad_doc_ids.at(ad_id);
+
+        auto doc_categories = document_categories.equal_range(doc_id);
+        auto doc_topics = document_topics.equal_range(doc_id);
+
+        for (auto it = doc_categories.first; it != doc_categories.second; ++ it) {
+            auto & ad_cat_cnt = ad_cat_counts[make_pair(uid, it->second.first)];
+
+            ad_cat_cnt.first += it->second.second;
+
+            if (clicked > 0)
+                ad_cat_cnt.second += it->second.second;
+        }
+
+        for (auto it = doc_topics.first; it != doc_topics.second; ++ it) {
+            auto & ad_top_cnt = ad_top_counts[make_pair(uid, it->second.first)];
+
+            ad_top_cnt.first += it->second.second;
+
+            if (clicked > 0)
+                ad_top_cnt.second += it->second.second;
+        }
+    }
+};
+
+
+struct row {
+    int event_id;
+    int ad_id;
+    int clicked;
+};
+
+
+template <typename W>
+void process_group(W & w, const std::vector<row> & group, std::ostream & out) {
+    for (auto it = group.begin(); it != group.end(); ++ it)
+        w.write(out, it->event_id, it->ad_id);
+
+    for (auto it = group.begin(); it != group.end(); ++ it)
+        w.update(it->event_id, it->ad_id, it->clicked);
+}
 
 
 template <typename W>
@@ -115,11 +293,6 @@ void generate(const std::string & a_in_file_name, const std::string & b_in_file_
     clock_t begin = clock();
 
     W w;
-
-    unordered_map<pair<int, int>, pair<uint8_t, uint8_t>> ad_counts;
-    unordered_map<pair<int, int>, pair<uint8_t, uint8_t>> ad_doc_counts;
-    unordered_map<pair<int, int>, pair<uint8_t, uint8_t>> ad_pub_counts;
-    unordered_map<pair<int, int>, pair<uint8_t, uint8_t>> ad_src_counts;
 
     compressed_csv_file a_in(a_in_file_name);
     compressed_csv_file b_in(b_in_file_name);
@@ -139,12 +312,46 @@ void generate(const std::string & a_in_file_name, const std::string & b_in_file_
 
     uint i = 0;
 
+    vector<row> group;
+    int group_id = -1;
+    boost::iostreams::filtering_ostream * group_out = nullptr;
+
     while (!a_row.empty() || !b_row.empty()) {
         if (b_row.empty() || (!a_row.empty() && stoi(a_row[0]) < stoi(b_row[0]))) {
-            w.process_row(a_out, stoi(a_row[0]), stoi(a_row[1]), stoi(a_row[2]) > 0);
+            row r;
+
+            r.event_id = stoi(a_row[0]);
+            r.ad_id = stoi(a_row[1]);
+            r.clicked = stoi(a_row[2]);
+
+            if (r.event_id != group_id) {
+                process_group(w, group, *group_out);
+
+                group.clear();
+                group_id = r.event_id;
+                group_out = &a_out;
+            }
+
+            group.push_back(r);
+
             a_row = a_in.getrow();
         } else {
-            w.process_row(b_out, stoi(b_row[0]), stoi(b_row[1]), false);
+            row r;
+
+            r.event_id = stoi(b_row[0]);
+            r.ad_id = stoi(b_row[1]);
+            r.clicked = -1;
+
+            if (r.event_id != group_id) {
+                process_group(w, group, *group_out);
+
+                group.clear();
+                group_id = r.event_id;
+                group_out = &b_out;
+            }
+
+            group.push_back(r);
+
             b_row = b_in.getrow();
         }
 
@@ -155,6 +362,8 @@ void generate(const std::string & a_in_file_name, const std::string & b_in_file_
             cout.flush();
         }
     }
+
+    process_group(w, group, *group_out);
 
     clock_t end = clock();
     double elapsed = double(end - begin) / CLOCKS_PER_SEC;
@@ -170,6 +379,8 @@ int main() {
     event_uids = read_vector("cache/events.csv.gz", read_event_uid, 23120127);
     ad_doc_ids = read_vector("../input/promoted_content.csv.gz", read_ad_document, 573099);
     documents = read_map("cache/documents.csv.gz", read_document);
+    document_categories = read_multi_map("../input/documents_categories.csv.gz", read_document_annotation);
+    document_topics = read_multi_map("../input/documents_topics.csv.gz", read_document_annotation);
 
     for (uint ofs = 0; ofs < filesets.size(); ofs += 2) {
         generate<basic_writer>(
@@ -184,6 +395,20 @@ int main() {
             filesets[ofs+1].first,
             string("cache/viewed_ad_srcs_") + filesets[ofs].second + string(".csv.gz"),
             string("cache/viewed_ad_srcs_") + filesets[ofs+1].second + string(".csv.gz")
+        );
+
+        generate<source_ctr_writer>(
+            filesets[ofs].first,
+            filesets[ofs+1].first,
+            string("cache/viewed_ad_src_ctrs_") + filesets[ofs].second + string(".csv.gz"),
+            string("cache/viewed_ad_src_ctrs_") + filesets[ofs+1].second + string(".csv.gz")
+        );
+
+        generate<theme_writer>(
+            filesets[ofs].first,
+            filesets[ofs+1].first,
+            string("cache/viewed_ad_themes_") + filesets[ofs].second + string(".csv.gz"),
+            string("cache/viewed_ad_themes_") + filesets[ofs+1].second + string(".csv.gz")
         );
     }
 

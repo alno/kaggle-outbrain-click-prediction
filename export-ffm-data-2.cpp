@@ -8,10 +8,10 @@
 #include <cmath>
 
 std::vector<std::pair<std::vector<std::string>, std::string>> filesets = {
-    { { "cache/clicks_val_train.csv.gz", "cache/leak_val_train.csv.gz", "cache/viewed_docs_val_train.csv.gz", "cache/viewed_ads_val_train.csv.gz" }, "cache/val_train_ffm_2" },
-    { { "cache/clicks_val_test.csv.gz", "cache/leak_val_test.csv.gz", "cache/viewed_docs_val_test.csv.gz", "cache/viewed_ads_val_test.csv.gz" }, "cache/val_test_ffm_2" },
-    { { "../input/clicks_train.csv.gz", "cache/leak_full_train.csv.gz", "cache/viewed_docs_full_train.csv.gz", "cache/viewed_ads_full_train.csv.gz" }, "cache/full_train_ffm_2" },
-    { { "../input/clicks_test.csv.gz", "cache/leak_full_test.csv.gz", "cache/viewed_docs_full_test.csv.gz", "cache/viewed_ads_full_test.csv.gz" }, "cache/full_test_ffm_2" },
+    { { "cache/clicks_val_train.csv.gz", "cache/leak_val_train.csv.gz", "cache/viewed_docs_val_train.csv.gz", "cache/viewed_ads_val_train.csv.gz", "cache/viewed_ad_srcs_val_train.csv.gz" }, "cache/val_train_ffm_2" },
+    { { "cache/clicks_val_test.csv.gz", "cache/leak_val_test.csv.gz", "cache/viewed_docs_val_test.csv.gz", "cache/viewed_ads_val_test.csv.gz", "cache/viewed_ad_srcs_val_test.csv.gz" }, "cache/val_test_ffm_2" },
+    { { "../input/clicks_train.csv.gz", "cache/leak_full_train.csv.gz", "cache/viewed_docs_full_train.csv.gz", "cache/viewed_ads_full_train.csv.gz", "cache/viewed_ad_srcs_full_train.csv.gz" }, "cache/full_train_ffm_2" },
+    { { "../input/clicks_test.csv.gz", "cache/leak_full_test.csv.gz", "cache/viewed_docs_full_test.csv.gz", "cache/viewed_ads_full_test.csv.gz", "cache/viewed_ad_srcs_full_test.csv.gz" }, "cache/full_test_ffm_2" },
 };
 
 std::hash<std::string> str_hash;
@@ -220,6 +220,20 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
 
     if (stoi(rows[3][3]) > 0)
         features.push_back(feature_raw(11, 9)); // Clicked this ad doc earlier
+
+    // Ad source view/click features
+
+    if (stoi(rows[4][0]) > 0)
+        features.push_back(feature_raw(11, 10)); // Viewed ad of the same publisher earlier
+
+    if (stoi(rows[4][1]) > 0)
+        features.push_back(feature_raw(11, 11)); // Clicked ad of the same publisher earlier
+
+    if (stoi(rows[4][2]) > 0)
+        features.push_back(feature_raw(11, 12)); // Viewed ad of the same source earlier
+
+    if (stoi(rows[4][3]) > 0)
+        features.push_back(feature_raw(11, 13)); // Clicked ad of the same source earlier
 
     features.push_back(feature_raw(12, event.weekday + 50));
     features.push_back(feature_raw(12, event.hour + 70));
