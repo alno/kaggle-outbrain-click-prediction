@@ -36,13 +36,14 @@ ffm_uint n_threads = 4;
 const ffm_ulong n_fields = 30;
 
 const ffm_ulong n_features = 1 << ffm_hash_bits;
-const ffm_ulong n_dim = 4;
 
+const ffm_ulong n_dim = 4;
+const ffm_ulong n_dim_aligned = ((n_dim - 1) / align_floats + 1) * align_floats;
 
 ffm_float * weights;
 
-const ffm_ulong index_stride = n_fields * n_dim * 2;
-const ffm_ulong field_stride = n_dim * 2;
+const ffm_ulong index_stride = n_fields * n_dim_aligned * 2;
+const ffm_ulong field_stride = n_dim_aligned * 2;
 
 std::default_random_engine rnd(2017);
 
@@ -122,8 +123,8 @@ void update(const ffm_feature * start, const ffm_feature * end, ffm_float norm, 
             ffm_float * wa = weights + index_a * index_stride + field_b * field_stride;
             ffm_float * wb = weights + index_b * index_stride + field_a * field_stride;
 
-            ffm_float * wga = wa + n_dim;
-            ffm_float * wgb = wb + n_dim;
+            ffm_float * wga = wa + n_dim_aligned;
+            ffm_float * wgb = wb + n_dim_aligned;
 
             __m128 xmm_kappa_val = _mm_set1_ps(kappa * value_a * value_b / norm);
 
@@ -387,17 +388,20 @@ void init_weights(ffm_float * weights, ffm_uint n, D gen) {
     ffm_float * w = weights;
 
     for(ffm_uint i = 0; i < n; i++) {
-        for(ffm_uint d = 0; d < n_dim; d++, w++)
+        for (ffm_uint d = 0; d < n_dim; d++, w++)
             *w = gen(rnd);
 
-        for(ffm_uint d = n_dim; d < 2*n_dim; d++, w++)
+        for (ffm_uint d = n_dim; d < n_dim_aligned; d++, w++)
+            *w = 0;
+
+        for (ffm_uint d = n_dim_aligned; d < 2*n_dim_aligned; d++, w++)
             *w = 1;
     }
 }
 
 
 void init_model() {
-    weights = malloc_aligned_float(n_features * n_fields * n_dim * 2);
+    weights = malloc_aligned_float(n_features * n_fields * n_dim_aligned * 2);
 
     init_weights(weights, n_features * n_fields, std::uniform_real_distribution<ffm_float>(0.0, 1.0/sqrt(n_dim)));
 }

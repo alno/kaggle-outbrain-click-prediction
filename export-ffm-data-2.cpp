@@ -33,12 +33,15 @@ ffm_feature feature_raw(uint32_t field, uint32_t index, float value = 1.0) {
     return f;
 }
 
+const uint32_t hash_offset = 200;
+const uint32_t hash_size = (1 << ffm_hash_bits) - hash_offset;
+
 ffm_feature feature_hashed(uint32_t field, uint32_t category, float value = 1.0) {
-    return feature_raw(field, h(category + field * 2654435761), value);
+    return feature_raw(field, h(category + field * 2654435761) % hash_size + hash_offset, value);
 }
 
 ffm_feature feature_hashed(uint32_t field, const std::string & category, float value = 1.0) {
-    return feature_raw(field, h(str_hash(category) + field * 2654435761), value);
+    return feature_raw(field, h(str_hash(category) + field * 2654435761) % hash_size + hash_offset, value);
 }
 
 inline float pos_time_diff(int64_t td) {
@@ -68,8 +71,15 @@ ffm_float norm(const std::vector<ffm_feature> & features) {
 std::string cur_dataset;
 
 std::unordered_map<int, int> ad_counts;
+std::unordered_map<int, int> ad_campaign_counts;
+std::unordered_map<int, int> ad_advertiser_counts;
 std::unordered_map<int, int> ad_doc_counts;
+std::unordered_map<int, int> ad_doc_source_counts;
+std::unordered_map<int, int> ad_doc_publisher_counts;
 std::unordered_map<int, int> ev_doc_counts;
+std::unordered_map<int, int> ev_doc_source_counts;
+std::unordered_map<int, int> ev_doc_publisher_counts;
+std::unordered_map<int, int> uid_counts;
 
 
 void load_dataset_data(const std::string & dataset) {
@@ -80,8 +90,17 @@ void load_dataset_data(const std::string & dataset) {
     std::cout << "Loading " << dataset << " data..." << std::endl;
 
     ad_counts = read_map(std::string("cache/ad_counts_") + dataset + std::string(".csv.gz"), read_count);
+    ad_campaign_counts = read_map(std::string("cache/ad_campaign_counts_") + dataset + std::string(".csv.gz"), read_count);
+    ad_advertiser_counts = read_map(std::string("cache/ad_advertiser_counts_") + dataset + std::string(".csv.gz"), read_count);
+
     ad_doc_counts = read_map(std::string("cache/ad_doc_counts_") + dataset + std::string(".csv.gz"), read_count);
+    ad_doc_source_counts = read_map(std::string("cache/ad_doc_source_counts_") + dataset + std::string(".csv.gz"), read_count);
+    ad_doc_publisher_counts = read_map(std::string("cache/ad_doc_publisher_counts_") + dataset + std::string(".csv.gz"), read_count);
+
     ev_doc_counts = read_map(std::string("cache/ev_doc_counts_") + dataset + std::string(".csv.gz"), read_count);
+    ev_doc_source_counts = read_map(std::string("cache/ev_doc_source_counts_") + dataset + std::string(".csv.gz"), read_count);
+    ev_doc_publisher_counts = read_map(std::string("cache/ev_doc_publisher_counts_") + dataset + std::string(".csv.gz"), read_count);
+    uid_counts = read_map(std::string("cache/uid_counts_") + dataset + std::string(".csv.gz"), read_count);
 }
 
 
@@ -127,26 +146,37 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
 
     // Get counts
     auto ad_count = ad_counts.at(ad_id);
+    auto ad_campaign_count = ad_campaign_counts.at(ad.campaign_id);
+    auto ad_advertiser_count = ad_advertiser_counts.at(ad.advertiser_id);
+
     auto ad_doc_count = ad_doc_counts.at(ad.document_id);
+    auto ad_doc_source_count = ad_doc_source_counts.at(ad_doc.source_id);
+    auto ad_doc_publisher_count = ad_doc_publisher_counts.at(ad_doc.publisher_id);
+
     auto ev_doc_count = ev_doc_counts.at(event.document_id);
+    auto ev_doc_source_count = ev_doc_source_counts.at(ev_doc.source_id);
+    auto ev_doc_publisher_count = ev_doc_publisher_counts.at(ev_doc.publisher_id);
+
+    auto uid_count = uid_counts.at(event.uid);
 
     // Start building line
-    //line_builder line(label);
     std::vector<ffm_feature> features;
 
 
     features.push_back(feature_hashed(0, ad_count < 50 ? ad_count : ad_id + 100));
-    features.push_back(feature_hashed(1, ad.campaign_id));
-    features.push_back(feature_hashed(2, ad.advertiser_id));
+    features.push_back(feature_hashed(1, ad_campaign_count < 50 ? ad_campaign_count : ad.campaign_id + 100));
+    features.push_back(feature_hashed(2, ad_advertiser_count < 50 ? ad_advertiser_count : ad.advertiser_id + 100));
 
     features.push_back(feature_hashed(3, event.platform));
     features.push_back(feature_hashed(4, event.country));
     features.push_back(feature_hashed(5, event.state));
+    //features.push_back(feature_hashed(18, event.region));
+    features.push_back(feature_hashed(18, uid_count < 50 ? uid_count : event.uid + 100));
 
     // Document info
     features.push_back(feature_hashed(6, ev_doc_count < 50 ? ev_doc_count : event.document_id + 100));
-    features.push_back(feature_hashed(7, ev_doc.source_id));
-    features.push_back(feature_hashed(8, ev_doc.publisher_id));
+    features.push_back(feature_hashed(7, ev_doc_source_count < 10 ? ev_doc_source_count : ev_doc.source_id + 10));
+    features.push_back(feature_hashed(8, ev_doc_publisher_count < 10 ? ev_doc_publisher_count : ev_doc.publisher_id + 10));
 
     for (auto it = ev_doc_categories.first; it != ev_doc_categories.second; ++ it)
         features.push_back(feature_hashed(12, it->second.first, it->second.second));
@@ -160,8 +190,8 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
 
     // Promoted document info
     features.push_back(feature_hashed(9, ad_doc_count < 50 ? ad_doc_count : ad.document_id + 100));
-    features.push_back(feature_hashed(10, ad_doc.source_id));
-    features.push_back(feature_hashed(11, ad_doc.publisher_id));
+    features.push_back(feature_hashed(10, ad_doc_source_count < 10 ? ad_doc_source_count : ad_doc.source_id + 10));
+    features.push_back(feature_hashed(11, ad_doc_publisher_count < 10 ? ad_doc_publisher_count : ad_doc.publisher_id + 10));
 
     for (auto it = ad_doc_categories.first; it != ad_doc_categories.second; ++ it)
         features.push_back(feature_hashed(13, it->second.first, it->second.second));
@@ -173,22 +203,24 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
         features.push_back(feature_hashed(17, it->second.first, it->second.second));
     */
 
-    //
+    // Same feature markers
 
     if (ad_doc.publisher_id == ev_doc.publisher_id)
-        features.push_back(feature_raw(18, 0)); // Same publisher
+        features.push_back(feature_raw(20, 0)); // Same publisher
 
     if (ad_doc.source_id == ev_doc.source_id)
-        features.push_back(feature_raw(19, 1)); // Same source
+        features.push_back(feature_raw(20, 1)); // Same source
+
+    // Leak features
 
     if (leak_viewed > 0)
-        features.push_back(feature_raw(20, 2)); // Viewed
+        features.push_back(feature_raw(21, 2)); // Viewed
 
     if (leak_not_viewed > 0)
         features.push_back(feature_raw(21, 3)); // Not viewed
 
     features.push_back(feature_raw(22, event.weekday + 50));
-    features.push_back(feature_raw(23, event.hour + 70));
+    features.push_back(feature_raw(22, event.hour + 70));
 
     features.push_back(feature_raw(24, 4, pos_time_diff(event.timestamp - ad_doc.publish_timestamp)));
     features.push_back(feature_raw(25, 5, time_diff(ev_doc.publish_timestamp - ad_doc.publish_timestamp)));
