@@ -3,10 +3,10 @@
 
 
 std::vector<std::pair<std::string, std::string>> filesets {
-    std::make_pair("cache/clicks_val_train.csv.gz", "cache/viewed_docs_val_train.csv.gz"),
-    std::make_pair("cache/clicks_val_test.csv.gz", "cache/viewed_docs_val_test.csv.gz"),
-    std::make_pair("../input/clicks_train.csv.gz", "cache/viewed_docs_full_train.csv.gz"),
-    std::make_pair("../input/clicks_test.csv.gz", "cache/viewed_docs_full_test.csv.gz"),
+    std::make_pair("cache/clicks_val_train.csv.gz", "val_train"),
+    std::make_pair("cache/clicks_val_test.csv.gz", "val_test"),
+    std::make_pair("../input/clicks_train.csv.gz", "full_train"),
+    std::make_pair("../input/clicks_test.csv.gz", "full_test"),
 };
 
 struct event_info {
@@ -16,8 +16,6 @@ struct event_info {
 
 
 std::unordered_map<std::string, int> uuid_map;
-std::unordered_map<std::pair<int, int>, int> publisher_views_map;
-std::unordered_map<std::pair<int, int>, int> source_views_map;
 
 
 std::pair<int, event_info> read_event_info(const std::vector<std::string> & row) {
@@ -44,18 +42,72 @@ std::pair<int, int> read_ad_document(const std::vector<std::string> & row) {
 }
 
 
-int main() {
+std::vector<event_info> events;
+std::vector<int> ad_doc_ids;
+std::unordered_map<int, document> documents;
+
+std::streamsize buffer_size = 1024*1024;
+
+
+class doc_source_writer {
+    std::unordered_map<std::pair<int, int>, int> publisher_views_map;
+    std::unordered_map<std::pair<int, int>, int> source_views_map;
+public:
+    std::string get_header() {
+        return "publisher_view_count,source_view_count";
+    }
+
+    void prepare(int uid, int document_id, int timestamp) {
+        using namespace std;
+
+        auto document = documents.at(document_id);
+
+        if (document.publisher_id > 0)
+            publisher_views_map[make_pair(document.publisher_id, uid)] = 0;
+
+        if (document.source_id > 0)
+            source_views_map[make_pair(document.source_id, uid)] = 0;
+    }
+
+    void update(int uid, int document_id, int timestamp) {
+        using namespace std;
+
+        auto document = documents.at(document_id);
+
+        auto pv_it = publisher_views_map.find(make_pair(document.publisher_id, uid));
+        if (pv_it != publisher_views_map.end())
+            pv_it->second ++;
+
+        auto sv_it = source_views_map.find(make_pair(document.source_id, uid));
+        if (sv_it != source_views_map.end())
+            sv_it->second ++;
+    }
+
+    void write(std::ostream & out, int uid, int document_id, int timestamp) {
+        using namespace std;
+
+        auto document = documents.at(document_id);
+
+        auto publisher_view_times = document.publisher_id > 0 ? publisher_views_map[make_pair(document.publisher_id, uid)] : -1;
+        auto source_view_times = document.source_id > 0 ? source_views_map[make_pair(document.source_id, uid)] : -1;
+
+        out << publisher_view_times << ","
+            << source_view_times << endl;
+    }
+};
+
+
+template <typename W>
+void generate(const std::string & file_name_prefix) {
     using namespace std;
 
-    cout << "Loading reference data..." << endl;
-    auto events = read_vector("cache/events.csv.gz", read_event_info, 23120127);
-    auto ad_documents = read_vector("../input/promoted_content.csv.gz", read_ad_document, 573099);
-    auto documents = read_map("cache/documents.csv.gz", read_document);
+    cout << "Generating " << file_name_prefix << "..." << endl;
 
+    W w;
 
-    cout << "Loading click data..." << endl;
+    cout << "  Loading click data..." << endl;
     for (auto it = filesets.begin(); it != filesets.end(); ++ it) {
-        cout << "  Loading " << it->first << "... ";
+        cout << "    Loading " << it->first << "... ";
         cout.flush();
 
         clock_t begin = clock();
@@ -69,14 +121,9 @@ int main() {
                 break;
 
             auto ev = events.at(stoi(row[0]));
-            auto document_id = ad_documents.at(stoi(row[1]));
-            auto document = documents.at(document_id);
+            auto document_id = ad_doc_ids.at(stoi(row[1]));
 
-            if (document.publisher_id > 0)
-                publisher_views_map[make_pair(document.publisher_id, ev.uid)] = 0;
-
-            if (document.source_id > 0)
-                source_views_map[make_pair(document.source_id, ev.uid)] = 0;
+            w.prepare(ev.uid, document_id, ev.timestamp);
 
             if (i > 0 && i % 5000000 == 0) {
                 cout << (i / 1000000) << "M... ";
@@ -91,7 +138,7 @@ int main() {
     }
 
     {
-        cout << "Processing leak data... ";
+        cout << "  Processing page views data... ";
         cout.flush();
 
         clock_t begin = clock();
@@ -107,22 +154,13 @@ int main() {
 
             auto uuid = row[0];
             auto document_id = stoi(row[1]);
-            auto document = documents.at(document_id);
+            auto timestamp = stoi(row[2]);
 
             // Register view
             auto uid_it = uuid_map.find(uuid);
             if (uid_it != uuid_map.end()) {
-                auto uid = uid_it->second;
-
-                auto pv_it = publisher_views_map.find(make_pair(document.publisher_id, uid));
-                if (pv_it != publisher_views_map.end())
-                    pv_it->second ++;
-
-                auto sv_it = source_views_map.find(make_pair(document.source_id, uid));
-                if (sv_it != source_views_map.end())
-                    sv_it->second ++;
+                w.update(uid_it->second, document_id, timestamp);
             }
-
 
             if (i > 0 && i % 5000000 == 0) {
                 cout << (i / 1000000) << "M... ";
@@ -136,24 +174,22 @@ int main() {
         cout << "done in " << elapsed << " seconds, found " << found << " entries" << endl;
     }
 
-    cout << "Generating viewed docs features..." << endl;
+    cout << "  Generating viewed docs features..." << endl;
     for (auto it = filesets.begin(); it != filesets.end(); ++ it) {
-        cout << "  Generating " << it->second << "... ";
+        auto out_file_name = string("cache/") + file_name_prefix + it->second + string(".csv.gz");
+
+        cout << "  Generating " << out_file_name << "... ";
         cout.flush();
 
         clock_t begin = clock();
 
         compressed_csv_file file(it->first);
-        ofstream outfile(it->second, std::ios_base::out | std::ios_base::binary);
 
-        streamsize buffer_size = 1024*1024;
-        boost::iostreams::filtering_streambuf<boost::iostreams::output> buf;
-        buf.push(boost::iostreams::gzip_compressor(), buffer_size, buffer_size);
-        buf.push(outfile, buffer_size, buffer_size);
+        boost::iostreams::filtering_ostream out;
+        out.push(boost::iostreams::gzip_compressor(), buffer_size, buffer_size);
+        out.push(boost::iostreams::file_sink(out_file_name, std::ios_base::out | std::ios_base::binary), buffer_size, buffer_size);
 
-        std::ostream out(&buf);
-
-        out << "publisher_view_count,source_view_count" << endl;
+        out << w.get_header() << endl;
 
         for (int i = 0;; ++i) {
             auto row = file.getrow();
@@ -162,14 +198,9 @@ int main() {
                 break;
 
             auto ev = events.at(stoi(row[0]));
-            auto document_id = ad_documents.at(stoi(row[1]));
-            auto document = documents.at(document_id);
+            auto document_id = ad_doc_ids.at(stoi(row[1]));
 
-            auto publisher_view_times = document.publisher_id > 0 ? publisher_views_map[make_pair(document.publisher_id, ev.uid)] : -1;
-            auto source_view_times = document.source_id > 0 ? source_views_map[make_pair(document.source_id, ev.uid)] : -1;
-
-            out << publisher_view_times << ","
-                << source_view_times << endl;
+            w.write(out, ev.uid, document_id, ev.timestamp);
 
             if (i > 0 && i % 5000000 == 0) {
                 cout << (i / 1000000) << "M... ";
@@ -182,6 +213,18 @@ int main() {
 
         cout << "done in " << elapsed << " seconds" << endl;
     }
+}
+
+
+int main() {
+    using namespace std;
+
+    cout << "Loading reference data..." << endl;
+    events = read_vector("cache/events.csv.gz", read_event_info, 23120127);
+    ad_doc_ids = read_vector("../input/promoted_content.csv.gz", read_ad_document, 573099);
+    documents = read_map("cache/documents.csv.gz", read_document);
+
+    generate<doc_source_writer>("viewed_docs");
 
     cout << "Done." << endl;
 }
