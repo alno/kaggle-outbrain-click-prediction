@@ -28,27 +28,29 @@ ffm_float * malloc_aligned_float(ffm_ulong size) {
     return (ffm_float*) ptr;
 }
 
-ffm_uint batch_size = 10000;
-ffm_uint mini_batch_size = 32;
-ffm_uint n_threads = 4;
-
+const ffm_uint batch_size = 10000;
+const ffm_uint mini_batch_size = 32;
 
 const ffm_ulong n_fields = 30;
-
 const ffm_ulong n_features = 1 << ffm_hash_bits;
 
 const ffm_ulong n_dim = 4;
 const ffm_ulong n_dim_aligned = ((n_dim - 1) / align_floats + 1) * align_floats;
 
-ffm_float * weights;
-
 const ffm_ulong index_stride = n_fields * n_dim_aligned * 2;
 const ffm_ulong field_stride = n_dim_aligned * 2;
 
+
 std::default_random_engine rnd(2017);
+
+
+ffm_float * weights;
 
 ffm_float eta = 0.2;
 ffm_float lambda = 0.0001;
+
+ffm_uint max_b_field = n_fields;
+ffm_uint min_a_field = 0;
 
 
 template <typename T>
@@ -70,10 +72,16 @@ ffm_float predict(const ffm_feature * start, const ffm_feature * end, ffm_float 
         ffm_uint field_a = fa->index >> ffm_hash_bits;
         ffm_float value_a = fa->value;
 
-        for (const ffm_feature * fb = fa + 1; fb != end; ++ fb) {
+        if (field_a < min_a_field)
+            continue;
+
+        for (const ffm_feature * fb = start; fb != fa; ++ fb) {
             ffm_uint index_b = fb->index &  ffm_hash_mask;
             ffm_uint field_b = fb->index >> ffm_hash_bits;
             ffm_float value_b = fb->value;
+
+            if (field_b > max_b_field)
+                break;
 
             //if (field_a == field_b)
             //    continue;
@@ -112,10 +120,16 @@ void update(const ffm_feature * start, const ffm_feature * end, ffm_float norm, 
         ffm_uint field_a = fa->index >> ffm_hash_bits;
         ffm_float value_a = fa->value;
 
-        for (const ffm_feature * fb = fa + 1; fb != end; ++ fb) {
+        if (field_a < min_a_field)
+            continue;
+
+        for (const ffm_feature * fb = start; fb != fa; ++ fb) {
             ffm_uint index_b = fb->index &  ffm_hash_mask;
             ffm_uint field_b = fb->index >> ffm_hash_bits;
             ffm_float value_b = fb->value;
+
+            if (field_b > max_b_field)
+                break;
 
             //if (field_a == field_b)
             //    continue;
@@ -430,8 +444,11 @@ public:
     std::string pred_file_name;
 
     ffm_uint n_epochs;
+    ffm_uint n_threads;
+
+    bool restricted;
 public:
-    program_options(int ac, char* av[]): desc("Allowed options"), n_epochs(1) {
+    program_options(int ac, char* av[]): desc("Allowed options"), n_epochs(10), n_threads(4) {
         using namespace boost::program_options;
 
         desc.add_options()
@@ -440,7 +457,9 @@ public:
             ("val", value<std::string>(&val_file_name), "validation dataset file")
             ("test", value<std::string>(&test_file_name), "test dataset file")
             ("pred", value<std::string>(&pred_file_name), "file to save predictions")
-            ("epochs", value<ffm_uint>(&n_epochs), "number of epochs")
+            ("epochs", value<ffm_uint>(&n_epochs), "number of epochs (default 10)")
+            ("threads", value<ffm_uint>(&n_threads), "number of threads (default 4)")
+            ("restricted", "restrict feature interactions to (E+C) * (C+A)")
         ;
 
         variables_map vm;
@@ -450,6 +469,8 @@ public:
             std::cout << desc << std::endl;
             exit(0);
         }
+
+        restricted = vm.count("restricted") > 0;
 
         notify(vm);
     }
@@ -461,7 +482,13 @@ int main(int ac, char* av[]) {
 
     program_options opts(ac, av);
 
-    omp_set_num_threads(n_threads);
+    omp_set_num_threads(opts.n_threads);
+
+    // Restricted FFM, exclude interactions of Event * Event or Ad * Ad features
+    if (opts.restricted) {
+        max_b_field = 19;
+        min_a_field = 10;
+    }
 
     init_model();
 
