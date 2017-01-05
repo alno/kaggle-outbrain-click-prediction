@@ -26,14 +26,6 @@ train[train_is_val].to_csv(val_split[1], index=True, compression='gzip')
 
 del train
 
-print "Splitting leak..."
-
-leak = pd.read_csv('cache/leak_full_train.csv.gz', dtype=np.uint8)
-leak[~train_is_val].to_csv('cache/leak_val_train.csv.gz', index=False, compression='gzip')
-leak[train_is_val].to_csv('cache/leak_val_test.csv.gz', index=False, compression='gzip')
-
-del leak
-
 print "Splitting similarity..."
 
 similarity = pd.read_csv('cache/similarity_full_train.csv.gz')

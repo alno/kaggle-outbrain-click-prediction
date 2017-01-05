@@ -1,4 +1,5 @@
 #include "util/io.h"
+#include "util/data.h"
 
 
 namespace std {
@@ -13,6 +14,8 @@ namespace std {
 //
 
 std::vector<std::pair<std::string, std::string>> filesets {
+    std::make_pair("cache/clicks_val_train.csv.gz", "cache/leak_val_train.csv.gz"),
+    std::make_pair("cache/clicks_val_test.csv.gz", "cache/leak_val_test.csv.gz"),
     std::make_pair("../input/clicks_train.csv.gz", "cache/leak_full_train.csv.gz"),
     std::make_pair("../input/clicks_test.csv.gz", "cache/leak_full_test.csv.gz"),
 };
@@ -24,7 +27,7 @@ struct event_info {
 
 
 std::unordered_map<std::string, int> uuid_map;
-std::unordered_map<std::pair<int, int>, std::vector<int>> views_map;
+std::unordered_map<std::pair<int, int>, std::vector<int>> doc_views_map;
 std::unordered_map<int,int> documents_map;
 
 
@@ -81,9 +84,9 @@ int main() {
                 break;
 
             auto ev = events.at(stoi(row[0]));
-            auto ad_document_id = ad_documents.at(stoi(row[1]));
+            auto document_id = ad_documents.at(stoi(row[1]));
 
-            views_map.insert(make_pair(make_pair(ad_document_id, ev.uid), std::vector<int>()));
+            doc_views_map[make_pair(document_id, ev.uid)] = std::vector<int>();
 
             if (i > 0 && i % 5000000 == 0) {
                 cout << (i / 1000000) << "M... ";
@@ -112,17 +115,17 @@ int main() {
             if (row.empty())
                 break;
 
-            auto document_id = stoi(row[1]);
             auto uuid = row[0];
+            auto document_id = stoi(row[1]);
 
             // Register view
             auto uid_it = uuid_map.find(uuid);
             if (uid_it != uuid_map.end()) {
-                auto key = make_pair(document_id, uid_it->second);
-                auto it = views_map.find(key);
+                auto uid = uid_it->second;
 
-                if (it != views_map.end()) {
-                    it->second.push_back(stoi(row[2]));
+                auto dv_it = doc_views_map.find(make_pair(document_id, uid));
+                if (dv_it != doc_views_map.end()) {
+                    dv_it->second.push_back(stoi(row[2]));
                     found ++;
                 }
             }
@@ -171,14 +174,13 @@ int main() {
                 break;
 
             auto ev = events.at(stoi(row[0]));
-            auto ad_document_id = ad_documents.at(stoi(row[1]));
+            auto document_id = ad_documents.at(stoi(row[1]));
 
-            auto view_times = views_map.at(make_pair(ad_document_id, ev.uid));
-            auto doc_views = documents_map.at(ad_document_id);
+            auto doc_view_times = doc_views_map.at(make_pair(document_id, ev.uid));
+            auto doc_views = documents_map.at(document_id);
 
-            auto viewed = view_times.size() > 0;
-
-            out << int(viewed) << "," << int(!viewed && (doc_views > 0)) << endl;
+            out << doc_view_times.size() << ","
+                << int(doc_view_times.size() == 0 && doc_views > 0) << endl;
 
             if (i > 0 && i % 5000000 == 0) {
                 cout << (i / 1000000) << "M... ";
