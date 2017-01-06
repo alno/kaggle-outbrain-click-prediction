@@ -4,6 +4,8 @@ import numpy as np
 import datetime
 import os
 
+from numba import jit
+
 from .meta import val_split_time
 
 
@@ -69,3 +71,37 @@ def score_prediction(pred):
 def print_and_exec(cmd):
     print cmd
     os.system(cmd)
+
+
+@jit
+def score_sorted(y_true, y_pred, y_group):
+    cur_group = -1
+
+    start_idx = -1
+    true_idx = -1
+
+    score_sum = 0.0
+    score_cnt = 0
+
+    for i in xrange(len(y_true)):
+        if y_group[i] > cur_group:
+            if cur_group >= 0:
+                rank = 0
+
+                for j in xrange(start_idx, i):
+                    if y_pred[j] >= y_pred[true_idx]:
+                        rank += 1
+
+                if rank > 0 and rank <= 12:
+                    score_sum += 1.0 / rank
+
+                score_cnt += 1
+
+            start_idx = i
+            true_idx = -1
+            cur_group = y_group[i]
+
+        if y_true[i]:
+            true_idx = i
+
+    return score_sum / score_cnt
