@@ -22,7 +22,7 @@ std::pair<int, int> read_ad_document(const std::vector<std::string> & row) {
 
 
 std::vector<int> event_uids;
-std::vector<int> ad_doc_ids;
+std::vector<ad> ads;
 std::unordered_map<int, document> documents;
 std::unordered_multimap<int, std::pair<int, float>> document_categories;
 std::unordered_multimap<int, std::pair<int, float>> document_topics;
@@ -42,7 +42,7 @@ public:
 
         auto uid = event_uids[event_id];
 
-        auto doc_id = ad_doc_ids.at(ad_id);
+        auto doc_id = ads[ad_id].document_id;
 
         auto & ad_cnt = ad_counts[make_pair(uid, ad_id)];
         auto & ad_doc_cnt = ad_doc_counts[make_pair(uid, doc_id)];
@@ -59,7 +59,7 @@ public:
 
         auto uid = event_uids[event_id];
 
-        auto doc_id = ad_doc_ids.at(ad_id);
+        auto doc_id = ads[ad_id].document_id;
 
         auto & ad_cnt = ad_counts[make_pair(uid, ad_id)];
         auto & ad_doc_cnt = ad_doc_counts[make_pair(uid, doc_id)];
@@ -93,7 +93,7 @@ public:
 
         auto uid = event_uids[event_id];
 
-        auto doc_id = ad_doc_ids.at(ad_id);
+        auto doc_id = ads[ad_id].document_id;
         auto doc = documents.at(doc_id);
 
         auto & ad_pub_cnt = ad_pub_counts[make_pair(uid, doc.publisher_id)];
@@ -110,7 +110,7 @@ public:
 
         auto uid = event_uids[event_id];
 
-        auto doc_id = ad_doc_ids.at(ad_id);
+        auto doc_id = ads[ad_id].document_id;
         auto doc = documents.at(doc_id);
 
         auto & ad_pub_cnt = ad_pub_counts[make_pair(uid, doc.publisher_id)];
@@ -131,6 +131,54 @@ public:
 };
 
 
+class campaign_writer {
+    std::unordered_map<std::pair<int, int>, std::pair<uint8_t, uint8_t>> ad_campaign_counts;
+    std::unordered_map<std::pair<int, int>, std::pair<uint8_t, uint8_t>> ad_advertiser_counts;
+public:
+
+    std::string get_header() {
+        return "ad_campaign_view_count,ad_campaign_click_count,ad_advertiser_view_count,ad_advertiser_click_count";
+    }
+
+    void write(std::ostream & out, int event_id, int ad_id) {
+        using namespace std;
+
+        auto uid = event_uids[event_id];
+        auto ad = ads[ad_id];
+
+        auto & ad_cmp_cnt = ad_campaign_counts[make_pair(uid, ad.campaign_id)];
+        auto & ad_adv_cnt = ad_advertiser_counts[make_pair(uid, ad.advertiser_id)];
+
+        out << int(ad_cmp_cnt.first) << ","
+            << int(ad_cmp_cnt.second) << ","
+            << int(ad_adv_cnt.first) << ","
+            << int(ad_adv_cnt.second) << endl;
+    }
+
+    void update(int event_id, int ad_id, int clicked) {
+        using namespace std;
+
+        auto uid = event_uids[event_id];
+        auto ad = ads[ad_id];
+
+        auto & ad_cmp_cnt = ad_campaign_counts[make_pair(uid, ad.campaign_id)];
+        auto & ad_adv_cnt = ad_advertiser_counts[make_pair(uid, ad.advertiser_id)];
+
+        if (int(ad_cmp_cnt.first) > 250 || int(ad_adv_cnt.first) > 250)
+            throw std::logic_error("Overflow is near");
+
+        ++ ad_cmp_cnt.first;
+        ++ ad_adv_cnt.first;
+
+        if (clicked > 0) {
+            ++ ad_cmp_cnt.second;
+            ++ ad_adv_cnt.second;
+        }
+    }
+
+};
+
+
 class source_ctr_writer {
     std::unordered_map<std::pair<int, int>, std::pair<uint8_t, uint8_t>> ad_pub_counts;
     std::unordered_map<std::pair<int, int>, std::pair<uint8_t, uint8_t>> ad_src_counts;
@@ -145,7 +193,7 @@ public:
 
         auto uid = event_uids[event_id];
 
-        auto doc_id = ad_doc_ids.at(ad_id);
+        auto doc_id = ads[ad_id].document_id;
         auto doc = documents.at(doc_id);
 
         auto & ad_pub_cnt = ad_pub_counts[make_pair(uid, doc.publisher_id)];
@@ -166,7 +214,7 @@ public:
 
         auto uid = event_uids[event_id];
 
-        auto doc_id = ad_doc_ids.at(ad_id);
+        auto doc_id = ads[ad_id].document_id;
         auto doc = documents.at(doc_id);
 
         auto & ad_pub_cnt = ad_pub_counts[make_pair(uid, doc.publisher_id)];
@@ -202,7 +250,7 @@ public:
         using namespace std;
 
         auto uid = event_uids[event_id];
-        auto doc_id = ad_doc_ids.at(ad_id);
+        auto doc_id = ads[ad_id].document_id;
         auto doc_categories = document_categories.equal_range(doc_id);
 
         float cat_view_weight = 0;
@@ -223,7 +271,7 @@ public:
         using namespace std;
 
         auto uid = event_uids[event_id];
-        auto doc_id = ad_doc_ids.at(ad_id);
+        auto doc_id = ads[ad_id].document_id;
         auto doc_categories = document_categories.equal_range(doc_id);
 
         for (auto it = doc_categories.first; it != doc_categories.second; ++ it) {
@@ -250,7 +298,7 @@ public:
         using namespace std;
 
         auto uid = event_uids[event_id];
-        auto doc_id = ad_doc_ids.at(ad_id);
+        auto doc_id = ads[ad_id].document_id;
         auto doc_topics = document_topics.equal_range(doc_id);
 
         float top_view_weight = 0;
@@ -271,7 +319,7 @@ public:
         using namespace std;
 
         auto uid = event_uids[event_id];
-        auto doc_id = ad_doc_ids.at(ad_id);
+        auto doc_id = ads[ad_id].document_id;
         auto doc_topics = document_topics.equal_range(doc_id);
 
         for (auto it = doc_topics.first; it != doc_topics.second; ++ it) {
@@ -397,7 +445,7 @@ int main() {
 
     cout << "Loading reference data..." << endl;
     event_uids = read_vector("cache/events.csv.gz", read_event_uid, 23120127);
-    ad_doc_ids = read_vector("../input/promoted_content.csv.gz", read_ad_document, 573099);
+    ads = read_ads();
     documents = read_map("cache/documents.csv.gz", read_document);
     document_categories = read_multi_map("../input/documents_categories.csv.gz", read_document_annotation);
     document_topics = read_multi_map("../input/documents_topics.csv.gz", read_document_annotation);
@@ -415,6 +463,13 @@ int main() {
             filesets[ofs+1].first,
             string("cache/viewed_ad_srcs_") + filesets[ofs].second + string(".csv.gz"),
             string("cache/viewed_ad_srcs_") + filesets[ofs+1].second + string(".csv.gz")
+        );
+
+        generate<campaign_writer>(
+            filesets[ofs].first,
+            filesets[ofs+1].first,
+            string("cache/viewed_ad_campaigns_") + filesets[ofs].second + string(".csv.gz"),
+            string("cache/viewed_ad_campaigns_") + filesets[ofs+1].second + string(".csv.gz")
         );
 
         generate<source_ctr_writer>(
