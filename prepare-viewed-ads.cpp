@@ -190,24 +190,20 @@ public:
 
 
 
-class theme_writer {
+class category_writer {
     std::unordered_map<std::pair<int, int>, std::pair<float, float>> ad_cat_counts;
-    std::unordered_map<std::pair<int, int>, std::pair<float, float>> ad_top_counts;
 public:
 
     std::string get_header() {
-        return "ad_category_view_weight,ad_category_click_weight,ad_topic_view_weight,ad_topic_click_weight";
+        return "ad_category_view_weight,ad_category_click_weight";
     }
 
     void write(std::ostream & out, int event_id, int ad_id) {
         using namespace std;
 
         auto uid = event_uids[event_id];
-
         auto doc_id = ad_doc_ids.at(ad_id);
-
         auto doc_categories = document_categories.equal_range(doc_id);
-        auto doc_topics = document_topics.equal_range(doc_id);
 
         float cat_view_weight = 0;
         float cat_click_weight = 0;
@@ -219,6 +215,44 @@ public:
             cat_click_weight += ad_cat_cnt.second * it->second.second;
         }
 
+        out << cat_view_weight << ","
+            << cat_click_weight << endl;
+    }
+
+    void update(int event_id, int ad_id, int clicked) {
+        using namespace std;
+
+        auto uid = event_uids[event_id];
+        auto doc_id = ad_doc_ids.at(ad_id);
+        auto doc_categories = document_categories.equal_range(doc_id);
+
+        for (auto it = doc_categories.first; it != doc_categories.second; ++ it) {
+            auto & ad_cat_cnt = ad_cat_counts[make_pair(uid, it->second.first)];
+
+            ad_cat_cnt.first += it->second.second;
+
+            if (clicked > 0)
+                ad_cat_cnt.second += it->second.second;
+        }
+    }
+};
+
+
+class topic_writer {
+    std::unordered_map<std::pair<int, int>, std::pair<float, float>> ad_top_counts;
+public:
+
+    std::string get_header() {
+        return "ad_topic_view_weight,ad_topic_click_weight";
+    }
+
+    void write(std::ostream & out, int event_id, int ad_id) {
+        using namespace std;
+
+        auto uid = event_uids[event_id];
+        auto doc_id = ad_doc_ids.at(ad_id);
+        auto doc_topics = document_topics.equal_range(doc_id);
+
         float top_view_weight = 0;
         float top_click_weight = 0;
 
@@ -229,9 +263,7 @@ public:
             top_click_weight += ad_top_cnt.second * it->second.second;
         }
 
-        out << cat_view_weight << ","
-            << cat_click_weight << ","
-            << top_view_weight << ","
+        out << top_view_weight << ","
             << top_click_weight << endl;
     }
 
@@ -239,20 +271,8 @@ public:
         using namespace std;
 
         auto uid = event_uids[event_id];
-
         auto doc_id = ad_doc_ids.at(ad_id);
-
-        auto doc_categories = document_categories.equal_range(doc_id);
         auto doc_topics = document_topics.equal_range(doc_id);
-
-        for (auto it = doc_categories.first; it != doc_categories.second; ++ it) {
-            auto & ad_cat_cnt = ad_cat_counts[make_pair(uid, it->second.first)];
-
-            ad_cat_cnt.first += it->second.second;
-
-            if (clicked > 0)
-                ad_cat_cnt.second += it->second.second;
-        }
 
         for (auto it = doc_topics.first; it != doc_topics.second; ++ it) {
             auto & ad_top_cnt = ad_top_counts[make_pair(uid, it->second.first)];
@@ -404,11 +424,18 @@ int main() {
             string("cache/viewed_ad_src_ctrs_") + filesets[ofs+1].second + string(".csv.gz")
         );
 
-        generate<theme_writer>(
+        generate<category_writer>(
             filesets[ofs].first,
             filesets[ofs+1].first,
-            string("cache/viewed_ad_themes_") + filesets[ofs].second + string(".csv.gz"),
-            string("cache/viewed_ad_themes_") + filesets[ofs+1].second + string(".csv.gz")
+            string("cache/viewed_ad_categories_") + filesets[ofs].second + string(".csv.gz"),
+            string("cache/viewed_ad_categories_") + filesets[ofs+1].second + string(".csv.gz")
+        );
+
+        generate<topic_writer>(
+            filesets[ofs].first,
+            filesets[ofs+1].first,
+            string("cache/viewed_ad_topics_") + filesets[ofs].second + string(".csv.gz"),
+            string("cache/viewed_ad_topics_") + filesets[ofs+1].second + string(".csv.gz")
         );
     }
 

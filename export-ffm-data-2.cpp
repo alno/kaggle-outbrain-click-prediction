@@ -8,10 +8,10 @@
 #include <cmath>
 
 std::vector<std::pair<std::vector<std::string>, std::string>> filesets = {
-    { { "cache/clicks_val_train.csv.gz", "cache/leak_val_train.csv.gz", "cache/viewed_docs_val_train.csv.gz", "cache/viewed_ads_val_train.csv.gz", "cache/viewed_ad_srcs_val_train.csv.gz", "cache/viewed_categories_val_train.csv.gz", "cache/viewed_topics_val_train.csv.gz" }, "cache/val_train_ffm_2" },
-    { { "cache/clicks_val_test.csv.gz", "cache/leak_val_test.csv.gz", "cache/viewed_docs_val_test.csv.gz", "cache/viewed_ads_val_test.csv.gz", "cache/viewed_ad_srcs_val_test.csv.gz", "cache/viewed_categories_val_test.csv.gz", "cache/viewed_topics_val_test.csv.gz" }, "cache/val_test_ffm_2" },
-    { { "../input/clicks_train.csv.gz", "cache/leak_full_train.csv.gz", "cache/viewed_docs_full_train.csv.gz", "cache/viewed_ads_full_train.csv.gz", "cache/viewed_ad_srcs_full_train.csv.gz", "cache/viewed_categories_full_train.csv.gz", "cache/viewed_topics_full_train.csv.gz" }, "cache/full_train_ffm_2" },
-    { { "../input/clicks_test.csv.gz", "cache/leak_full_test.csv.gz", "cache/viewed_docs_full_test.csv.gz", "cache/viewed_ads_full_test.csv.gz", "cache/viewed_ad_srcs_full_test.csv.gz", "cache/viewed_categories_full_test.csv.gz", "cache/viewed_topics_full_test.csv.gz" }, "cache/full_test_ffm_2" },
+    { { "cache/clicks_val_train.csv.gz", "cache/leak_val_train.csv.gz", "cache/viewed_docs_val_train.csv.gz", "cache/viewed_ads_val_train.csv.gz", "cache/viewed_ad_srcs_val_train.csv.gz", "cache/viewed_ad_categories_val_train.csv.gz", "cache/viewed_ad_topics_val_train.csv.gz", "cache/viewed_categories_val_train.csv.gz", "cache/viewed_topics_val_train.csv.gz" }, "cache/val_train_ffm_2" },
+    { { "cache/clicks_val_test.csv.gz", "cache/leak_val_test.csv.gz", "cache/viewed_docs_val_test.csv.gz", "cache/viewed_ads_val_test.csv.gz", "cache/viewed_ad_srcs_val_test.csv.gz", "cache/viewed_ad_categories_val_test.csv.gz", "cache/viewed_ad_topics_val_test.csv.gz", "cache/viewed_categories_val_test.csv.gz", "cache/viewed_topics_val_test.csv.gz" }, "cache/val_test_ffm_2" },
+    { { "../input/clicks_train.csv.gz", "cache/leak_full_train.csv.gz", "cache/viewed_docs_full_train.csv.gz", "cache/viewed_ads_full_train.csv.gz", "cache/viewed_ad_srcs_full_train.csv.gz", "cache/viewed_ad_categories_full_train.csv.gz", "cache/viewed_ad_topics_full_train.csv.gz", "cache/viewed_categories_full_train.csv.gz", "cache/viewed_topics_full_train.csv.gz" }, "cache/full_train_ffm_2" },
+    { { "../input/clicks_test.csv.gz", "cache/leak_full_test.csv.gz", "cache/viewed_docs_full_test.csv.gz", "cache/viewed_ads_full_test.csv.gz", "cache/viewed_ad_srcs_full_test.csv.gz", "cache/viewed_ad_categories_full_test.csv.gz", "cache/viewed_ad_topics_full_test.csv.gz", "cache/viewed_categories_full_test.csv.gz", "cache/viewed_topics_full_test.csv.gz" }, "cache/full_test_ffm_2" },
 };
 
 std::hash<std::string> str_hash;
@@ -235,11 +235,27 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     if (stoi(rows[4][3]) > 0)
         features.push_back(feature_raw(11, 13)); // Clicked ad of the same source earlier
 
+    // Ad category/topic
+
     if (stof(rows[5][0]) > 0)
-        features.push_back(feature_raw(11, 14)); // Viewed documents of the similar category
+        features.push_back(feature_raw(11, 14)); // Viewed ad of the similar category
+
+    if (stof(rows[5][1]) > 0)
+        features.push_back(feature_raw(11, 15)); // Clicked ad of the similar category
 
     if (stof(rows[6][0]) > 0)
-        features.push_back(feature_raw(11, 15)); // Viewed documents of the similar topic
+        features.push_back(feature_raw(11, 16)); // Viewed ad of the similar topic
+
+    if (stof(rows[6][1]) > 0)
+        features.push_back(feature_raw(11, 17)); // Clicked ad of the similar topic
+
+    // Viewed category/topic
+
+    if (stof(rows[7][0]) > 0)
+        features.push_back(feature_raw(11, 18)); // Viewed documents of the similar category
+
+    if (stof(rows[8][0]) > 0)
+        features.push_back(feature_raw(11, 19)); // Viewed documents of the similar topic
 
     features.push_back(feature_raw(12, event.weekday + 50));
     features.push_back(feature_raw(12, event.hour + 70));
