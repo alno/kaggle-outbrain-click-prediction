@@ -16,6 +16,7 @@ struct event {
     std::string country;
     std::string state;
     std::string region;
+    std::string location;
 };
 
 struct ad {
@@ -46,13 +47,15 @@ std::pair<int, event> read_event(const std::vector<std::string> & row) {
         e.platform = 0;
     }
 
-    e.country = row[5];
-    e.state = row[6];
-    e.region = row[7];
+    e.location = row[5];
 
-    e.hour = stoi(row[8]);
-    e.weekday = stoi(row[9]);
-    e.uid = stoi(row[10]);
+    e.country = row[6];
+    e.state = row[7];
+    e.region = row[8];
+
+    e.hour = stoi(row[9]);
+    e.weekday = stoi(row[10]);
+    e.uid = stoi(row[11]);
 
     return std::make_pair(stoi(row[0]), e);
 }

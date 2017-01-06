@@ -17,7 +17,6 @@ df = pd.read_csv(os.path.join(input_dir, 'events.csv.zip'), index_col='display_i
 df['platform'] = df['platform'].replace({'\N': 0}).astype(np.uint8)
 
 location = df['geo_location'].fillna('').str.split('>')
-df.drop(['geo_location'], axis=1, inplace=True)
 
 df['country'] = location.map(lambda loc: loc[0] if len(loc) > 0 else 'Z')
 df['state'] = location.map(lambda loc: loc[1] if len(loc) > 1 else 'Z')

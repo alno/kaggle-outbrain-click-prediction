@@ -13,7 +13,7 @@ std::vector<std::pair<std::string, std::string>> filesets {
 std::streamsize buffer_size = 1024*1024;
 
 std::pair<int, int> read_event_uid(const std::vector<std::string> & row) {
-    return std::make_pair(stoi(row[0]), stoi(row[10]));
+    return std::make_pair(stoi(row[0]), stoi(row[11]));
 }
 
 std::pair<int, int> read_ad_document(const std::vector<std::string> & row) {
