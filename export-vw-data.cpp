@@ -2,11 +2,17 @@
 #include "util/data.h"
 #include "util/generation.h"
 
-std::vector<std::pair<std::vector<std::string>, std::string>> filesets = {
-    { { "cache/clicks_val_train.csv.gz", "cache/leak_val_train.csv.gz", "cache/similarity_val_train.csv.gz" }, "cache/val_train_vw.txt" },
-    { { "cache/clicks_val_test.csv.gz", "cache/leak_val_test.csv.gz", "cache/similarity_val_test.csv.gz" }, "cache/val_test_vw.txt" },
-    { { "../input/clicks_train.csv.gz", "cache/leak_full_train.csv.gz", "cache/similarity_full_train.csv.gz" }, "cache/full_train_vw.txt" },
-    { { "../input/clicks_test.csv.gz", "cache/leak_full_test.csv.gz", "cache/similarity_full_test.csv.gz" }, "cache/full_test_vw.txt" },
+std::vector<std::pair<std::string, std::string>> files = {
+    { "cache/clicks_val_train.csv.gz", "val_train" },
+    { "cache/clicks_val_test.csv.gz", "val_test" },
+    { "../input/clicks_train.csv.gz", "full_train" },
+    { "../input/clicks_test.csv.gz", "full_test" },
+};
+
+std::vector<std::string> features = {
+    "leak", "similarity",
+    "viewed_docs",
+    "viewed_ads", "viewed_ad_srcs",
 };
 
 class writer {
@@ -96,9 +102,34 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     for (uint i = 0; i < rows[2].size(); ++ i)
         line << " s_" << i << ':' << rows[2][i];
 
+    // Ad views features
+    for (uint ri = 3; ri <= 5; ++ ri)
+        for (uint ci = 0; ci < rows[ri].size(); ++ ci)
+            if (stoi(rows[ri][ci]) > 0)
+                line << " av_" << ri << "_" << ci;
+
     line << std::endl;
 
     out << line.str();
+}
+
+auto build_filesets() {
+    using namespace std;
+
+    vector<pair<vector<string>, string>> filesets;
+
+    for (auto fi = files.begin(); fi != files.end(); ++ fi) {
+        vector<string> inputs;
+
+        inputs.push_back(fi->first);
+
+        for (auto ffi = features.begin(); ffi != features.end(); ++ ffi)
+            inputs.push_back(string("cache/") + (*ffi) + string("_") + fi->second + string(".csv.gz"));
+
+        filesets.push_back(make_pair(inputs, string("cache/") + fi->second + string("_vw.txt")));
+    }
+
+    return filesets;
 }
 
 int main() {
@@ -108,7 +139,7 @@ int main() {
     auto data = load_reference_data();
 
     cout << "Generating files..." << endl;
-    generate_files<reference_data, writer>(data, filesets);
+    generate_files<reference_data, writer>(data, build_filesets());
 
     cout << "Done." << endl;
 }
