@@ -45,6 +45,8 @@ std::pair<int, int> read_ad_document(const std::vector<std::string> & row) {
 std::vector<event_info> events;
 std::vector<int> ad_doc_ids;
 std::unordered_map<int, document> documents;
+std::unordered_multimap<int, std::pair<int, float>> document_categories;
+std::unordered_multimap<int, std::pair<int, float>> document_topics;
 
 std::streamsize buffer_size = 1024*1024;
 
@@ -93,6 +95,80 @@ public:
 
         out << publisher_view_times << ","
             << source_view_times << endl;
+    }
+};
+
+
+class doc_category_writer {
+    std::unordered_map<std::pair<int, int>, float> category_views_map;
+public:
+    std::string get_header() {
+        return "category_view_weight";
+    }
+
+    void prepare(int uid, int document_id, int timestamp) {
+        auto doc_categories = document_categories.equal_range(document_id);
+
+        for (auto it = doc_categories.first; it != doc_categories.second; ++ it)
+            category_views_map[std::make_pair(it->second.first, uid)] = 0;
+    }
+
+    void update(int uid, int document_id, int timestamp) {
+        auto doc_categories = document_categories.equal_range(document_id);
+
+        for (auto it = doc_categories.first; it != doc_categories.second; ++ it) {
+            auto cv_it = category_views_map.find(std::make_pair(it->second.first, uid));
+            if (cv_it != category_views_map.end())
+                cv_it->second += it->second.second;
+        }
+    }
+
+    void write(std::ostream & out, int uid, int document_id, int timestamp) {
+        auto doc_categories = document_categories.equal_range(document_id);
+
+        float category_view_weight = 0;
+
+        for (auto it = doc_categories.first; it != doc_categories.second; ++ it)
+            category_view_weight += category_views_map[std::make_pair(it->second.first, uid)];
+
+        out << category_view_weight << std::endl;
+    }
+};
+
+
+class doc_topic_writer {
+    std::unordered_map<std::pair<int, int>, float> topic_views_map;
+public:
+    std::string get_header() {
+        return "topic_view_weight";
+    }
+
+    void prepare(int uid, int document_id, int timestamp) {
+        auto doc_topics = document_topics.equal_range(document_id);
+
+        for (auto it = doc_topics.first; it != doc_topics.second; ++ it)
+            topic_views_map[std::make_pair(it->second.first, uid)] = 0;
+    }
+
+    void update(int uid, int document_id, int timestamp) {
+        auto doc_topics = document_topics.equal_range(document_id);
+
+        for (auto it = doc_topics.first; it != doc_topics.second; ++ it) {
+            auto cv_it = topic_views_map.find(std::make_pair(it->second.first, uid));
+            if (cv_it != topic_views_map.end())
+                cv_it->second += it->second.second;
+        }
+    }
+
+    void write(std::ostream & out, int uid, int document_id, int timestamp) {
+        auto doc_topics = document_topics.equal_range(document_id);
+
+        float topic_view_weight = 0;
+
+        for (auto it = doc_topics.first; it != doc_topics.second; ++ it)
+            topic_view_weight += topic_views_map[std::make_pair(it->second.first, uid)];
+
+        out << topic_view_weight << std::endl;
     }
 };
 
@@ -176,7 +252,7 @@ void generate(const std::string & file_name_prefix) {
 
     cout << "  Generating viewed docs features..." << endl;
     for (auto it = filesets.begin(); it != filesets.end(); ++ it) {
-        auto out_file_name = string("cache/") + file_name_prefix + it->second + string(".csv.gz");
+        auto out_file_name = string("cache/") + file_name_prefix + string("_") + it->second + string(".csv.gz");
 
         cout << "  Generating " << out_file_name << "... ";
         cout.flush();
@@ -223,8 +299,12 @@ int main() {
     events = read_vector("cache/events.csv.gz", read_event_info, 23120127);
     ad_doc_ids = read_vector("../input/promoted_content.csv.gz", read_ad_document, 573099);
     documents = read_map("cache/documents.csv.gz", read_document);
+    document_categories = read_multi_map("../input/documents_categories.csv.gz", read_document_annotation);
+    document_topics = read_multi_map("../input/documents_topics.csv.gz", read_document_annotation);
 
     generate<doc_source_writer>("viewed_docs");
+    generate<doc_category_writer>("viewed_categories");
+    generate<doc_topic_writer>("viewed_topics");
 
     cout << "Done." << endl;
 }
