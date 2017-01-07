@@ -434,6 +434,23 @@ int uid_extractor(const event & e) {
     return e.uid;
 }
 
+std::unordered_map<std::pair<int, std::string>, int> g1_id_map;
+
+// Group by time bucket + platform + location prefix
+int g2_extractor(const event & e) {
+    int group_time = (e.timestamp / (3600 * 1000 * 3)) % (7 * 8); // Buckets by 3 hours during a week
+    auto group = make_pair(e.platform + group_time * 100, e.location.substr(0, 5));
+
+    auto it = g1_id_map.find(group);
+    if (it == g1_id_map.end()) {
+        int res = g1_id_map.size();
+        g1_id_map.insert(std::make_pair(group, res));
+        return res;
+    } else {
+        return it->second;
+    }
+}
+
 
 int main() {
     using namespace std;
@@ -453,6 +470,8 @@ int main() {
         generate<topic_writer>(uid_extractor, "viewed_ad_topics", ofs);
 
         generate<source_ctr_writer>(uid_extractor, "viewed_ad_src_ctrs", ofs);
+
+        generate<category_writer>(g2_extractor, "g2_viewed_ad_categories", ofs);
     }
 
     cout << "Done." << endl;
