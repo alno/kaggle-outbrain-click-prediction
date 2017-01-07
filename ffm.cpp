@@ -53,6 +53,10 @@ std::default_random_engine rnd(2017);
 
 ffm_float * weights;
 
+ffm_float bias_w = 0;
+ffm_float bias_wg = 1;
+
+
 ffm_float eta = 0.2;
 ffm_float lambda = 0.00002;
 
@@ -72,7 +76,7 @@ struct ffm_dataset {
 
 
 ffm_float predict(const ffm_feature * start, const ffm_feature * end, ffm_float norm, uint64_t * mask) {
-    __m128 xmm_total = _mm_setzero_ps();
+    __m128 xmm_total = _mm_set1_ps(bias_w);
 
     ffm_uint i = 0;
 
@@ -187,6 +191,10 @@ void update(const ffm_feature * start, const ffm_feature * end, ffm_float norm, 
             }
         }
     }
+
+    // Update bias
+    bias_wg += kappa;
+    bias_w -= eta * kappa / sqrt(bias_wg);
 }
 
 
