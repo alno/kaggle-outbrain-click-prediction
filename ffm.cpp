@@ -6,12 +6,14 @@
 #include <random>
 #include <algorithm>
 
-#include <pmmintrin.h>
 #include <immintrin.h>
 
 #include <omp.h>
 
 #include <boost/program_options.hpp>
+
+// Define intrinsic missing in gcc
+#define _mm256_set_m128(v0, v1)  _mm256_insertf128_ps(_mm256_castps128_ps256(v1), (v0), 1)
 
 
 const ffm_uint align_bytes = 16;
@@ -128,8 +130,8 @@ ffm_float predict(const ffm_feature * start, const ffm_feature * end, ffm_float 
 
 
 void update(const ffm_feature * start, const ffm_feature * end, ffm_float norm, ffm_float kappa, uint64_t * mask) {
-    __m128 xmm_eta = _mm_set1_ps(eta);
-    __m128 xmm_lambda = _mm_set1_ps(lambda);
+    __m256 xmm_eta = _mm256_set1_ps(eta);
+    __m256 xmm_lambda = _mm256_set1_ps(lambda);
 
     ffm_uint i = 0;
 
@@ -161,33 +163,26 @@ void update(const ffm_feature * start, const ffm_feature * end, ffm_float norm, 
             ffm_float * wga = wa + n_dim_aligned;
             ffm_float * wgb = wb + n_dim_aligned;
 
-            __m128 xmm_kappa_val = _mm_set1_ps(kappa * value_a * value_b / norm);
+            __m256 xmm_kappa_val = _mm256_set1_ps(kappa * value_a * value_b / norm);
 
             for(ffm_uint d = 0; d < n_dim; d += 4) {
                 // Load weights
-                __m128 xmm_wa = _mm_load_ps(wa + d);
-                __m128 xmm_wb = _mm_load_ps(wb + d);
-
-                __m128 xmm_wga = _mm_load_ps(wga + d);
-                __m128 xmm_wgb = _mm_load_ps(wgb + d);
+                __m256 xmm_w = _mm256_set_m128(_mm_load_ps(wa + d), _mm_load_ps(wb + d));
+                __m256 xmm_wg = _mm256_set_m128(_mm_load_ps(wga + d), _mm_load_ps(wgb + d));
 
                 // Compute gradient values
-                __m128 xmm_ga = _mm_add_ps(_mm_mul_ps(xmm_lambda, xmm_wa), _mm_mul_ps(xmm_kappa_val, xmm_wb));
-                __m128 xmm_gb = _mm_add_ps(_mm_mul_ps(xmm_lambda, xmm_wb), _mm_mul_ps(xmm_kappa_val, xmm_wa));
+                __m256 xmm_g = _mm256_add_ps(_mm256_mul_ps(xmm_lambda, xmm_w), _mm256_mul_ps(xmm_kappa_val, _mm256_permute2f128_ps(xmm_w, xmm_w, 1)));
 
                 // Update weights
-                xmm_wga = _mm_add_ps(xmm_wga, _mm_mul_ps(xmm_ga, xmm_ga));
-                xmm_wgb = _mm_add_ps(xmm_wgb, _mm_mul_ps(xmm_gb, xmm_gb));
-
-                xmm_wa = _mm_sub_ps(xmm_wa, _mm_mul_ps(xmm_eta, _mm_mul_ps(_mm_rsqrt_ps(xmm_wga), xmm_ga)));
-                xmm_wb = _mm_sub_ps(xmm_wb, _mm_mul_ps(xmm_eta, _mm_mul_ps(_mm_rsqrt_ps(xmm_wgb), xmm_gb)));
+                xmm_wg = _mm256_add_ps(xmm_wg, _mm256_mul_ps(xmm_g, xmm_g));
+                xmm_w  = _mm256_sub_ps(xmm_w, _mm256_mul_ps(xmm_eta, _mm256_mul_ps(_mm256_rsqrt_ps(xmm_wg), xmm_g)));
 
                 // Store weights
-                _mm_store_ps(wa + d, xmm_wa);
-                _mm_store_ps(wb + d, xmm_wb);
+                _mm_store_ps(wa + d, _mm256_extractf128_ps(xmm_w, 1));
+                _mm_store_ps(wb + d, _mm256_extractf128_ps(xmm_w, 0));
 
-                _mm_store_ps(wga + d, xmm_wga);
-                _mm_store_ps(wgb + d, xmm_wgb);
+                _mm_store_ps(wga + d, _mm256_extractf128_ps(xmm_wg, 1));
+                _mm_store_ps(wgb + d, _mm256_extractf128_ps(xmm_wg, 0));
             }
         }
     }

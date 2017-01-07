@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -Wall -O3 -std=c++14 -march=native -mrdrnd
+CXXFLAGS = -Wall -O3 -std=c++14 -march=native
 
 # comment the following flags if you do not want to use OpenMP
 DFLAG += -DUSEOMP
