@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include <pmmintrin.h>
+#include <immintrin.h>
 
 #include <omp.h>
 
@@ -41,13 +42,19 @@ const ffm_ulong index_stride = n_fields * n_dim_aligned * 2;
 const ffm_ulong field_stride = n_dim_aligned * 2;
 
 
+// Dropout configuration
+const ffm_uint dropout_mask_size = 100; // in 64-bit words
+const ffm_uint dropout_prob_log = 1; // 0.5 dropout rate
+const ffm_float dropout_norm_mult = ((1 << dropout_prob_log) - 1.0f) / (1 << dropout_prob_log);
+
+
 std::default_random_engine rnd(2017);
 
 
 ffm_float * weights;
 
 ffm_float eta = 0.2;
-ffm_float lambda = 0.0001;
+ffm_float lambda = 0.00002;
 
 ffm_uint max_b_field = n_fields;
 ffm_uint min_a_field = 0;
@@ -64,8 +71,10 @@ struct ffm_dataset {
 };
 
 
-ffm_float predict(const ffm_feature * start, const ffm_feature * end, ffm_float norm) {
+ffm_float predict(const ffm_feature * start, const ffm_feature * end, ffm_float norm, uint64_t * mask) {
     __m128 xmm_total = _mm_setzero_ps();
+
+    ffm_uint i = 0;
 
     for (const ffm_feature * fa = start; fa != end; ++ fa) {
         ffm_uint index_a = fa->index &  ffm_hash_mask;
@@ -75,13 +84,16 @@ ffm_float predict(const ffm_feature * start, const ffm_feature * end, ffm_float 
         if (field_a < min_a_field)
             continue;
 
-        for (const ffm_feature * fb = start; fb != fa; ++ fb) {
+        for (const ffm_feature * fb = start; fb != fa; ++ fb, ++ i) {
             ffm_uint index_b = fb->index &  ffm_hash_mask;
             ffm_uint field_b = fb->index >> ffm_hash_bits;
             ffm_float value_b = fb->value;
 
             if (field_b > max_b_field)
                 break;
+
+            if (((mask[i >> 6] >> (i & 63)) & 1) == 0)
+                continue;
 
             //if (field_a == field_b)
             //    continue;
@@ -111,9 +123,11 @@ ffm_float predict(const ffm_feature * start, const ffm_feature * end, ffm_float 
 }
 
 
-void update(const ffm_feature * start, const ffm_feature * end, ffm_float norm, ffm_float kappa) {
+void update(const ffm_feature * start, const ffm_feature * end, ffm_float norm, ffm_float kappa, uint64_t * mask) {
     __m128 xmm_eta = _mm_set1_ps(eta);
     __m128 xmm_lambda = _mm_set1_ps(lambda);
+
+    ffm_uint i = 0;
 
     for (const ffm_feature * fa = start; fa != end; ++ fa) {
         ffm_uint index_a = fa->index &  ffm_hash_mask;
@@ -123,13 +137,16 @@ void update(const ffm_feature * start, const ffm_feature * end, ffm_float norm, 
         if (field_a < min_a_field)
             continue;
 
-        for (const ffm_feature * fb = start; fb != fa; ++ fb) {
+        for (const ffm_feature * fb = start; fb != fa; ++ fb, ++ i) {
             ffm_uint index_b = fb->index &  ffm_hash_mask;
             ffm_uint field_b = fb->index >> ffm_hash_bits;
             ffm_float value_b = fb->value;
 
             if (field_b > max_b_field)
                 break;
+
+            if (((mask[i >> 6] >> (i & 63)) & 1) == 0)
+                continue;
 
             //if (field_a == field_b)
             //    continue;
@@ -198,6 +215,23 @@ std::vector<std::pair<ffm_ulong, ffm_ulong>> generate_mini_batches(ffm_ulong beg
 }
 
 
+void fill_mask_rand(uint64_t * mask, int size, int zero_prob_log) {
+    memset(mask, 0, size * sizeof(uint64_t));
+
+    for (int p = 0; p < size; ++ p) {
+        for (int i = 0; i < zero_prob_log; ++ i) {
+            long long unsigned int v;
+            _rdrand64_step(&v);
+            mask[p] |= v;
+        }
+    }
+}
+
+void fill_mask_ones(uint64_t * mask, int size) {
+    memset(mask, 0xFF, size * sizeof(uint64_t));
+}
+
+
 ffm_double train_on_dataset(const ffm_dataset & dataset) {
     clock_t begin = clock();
 
@@ -223,20 +257,27 @@ ffm_double train_on_dataset(const ffm_dataset & dataset) {
         std::vector<ffm_feature> batch_features = ffm_read_batch(dataset.data_file_name, batch_start_offset, batch_end_offset);
         ffm_feature * batch_features_data = batch_features.data();
 
+        uint64_t mask[dropout_mask_size];
+
         for (auto mb = mini_batches.begin(); mb != mini_batches.end(); ++ mb) {
             for (auto ei = mb->first; ei < mb->second; ++ ei) {
                 ffm_float y = dataset.index.labels[ei];
-                ffm_float norm = dataset.index.norms[ei];
+                ffm_float norm = dataset.index.norms[ei] * dropout_norm_mult;
 
                 auto start_offset = dataset.index.offsets[ei] - batch_start_offset;
                 auto end_offset = dataset.index.offsets[ei+1] - batch_start_offset;
 
-                ffm_float t = predict(batch_features_data + start_offset, batch_features_data + end_offset, norm);
+                auto feature_count = end_offset - start_offset;
+                auto interaction_count = feature_count * (feature_count + 1) / 2;
+
+                fill_mask_rand(mask, (interaction_count + 63) / 64, dropout_prob_log);
+
+                ffm_float t = predict(batch_features_data + start_offset, batch_features_data + end_offset, norm, mask);
                 ffm_float expnyt = exp(-y*t);
 
                 loss += log(1+expnyt);
 
-                update(batch_features_data + start_offset, batch_features_data + end_offset, norm, -y * expnyt / (1+expnyt));
+                update(batch_features_data + start_offset, batch_features_data + end_offset, norm, -y * expnyt / (1+expnyt), mask);
             }
         }
 
@@ -309,6 +350,9 @@ ffm_double evaluate_on_dataset(const ffm_dataset & dataset) {
 
     auto batches = generate_batches(dataset.index, false);
 
+    uint64_t mask[dropout_mask_size];
+    fill_mask_ones(mask, dropout_mask_size);
+
     ffm_double loss = 0.0;
     ffm_uint cnt = 0;
 
@@ -333,7 +377,7 @@ ffm_double evaluate_on_dataset(const ffm_dataset & dataset) {
             auto start_offset = dataset.index.offsets[ei] - batch_start_offset;
             auto end_offset = dataset.index.offsets[ei+1] - batch_start_offset;
 
-            ffm_float t = predict(batch_features_data + start_offset, batch_features_data + end_offset, norm);
+            ffm_float t = predict(batch_features_data + start_offset, batch_features_data + end_offset, norm, mask);
             ffm_float expnyt = exp(-y*t);
 
             loss += log(1+expnyt);
@@ -363,6 +407,9 @@ void predict_on_dataset(const ffm_dataset & dataset, std::ostream & out) {
 
     auto batches = generate_batches(dataset.index, false);
 
+    uint64_t mask[dropout_mask_size];
+    fill_mask_ones(mask, dropout_mask_size);
+
     ffm_ulong cnt = 0;
 
     // Iterate over batches, read each and then iterate over examples
@@ -382,7 +429,7 @@ void predict_on_dataset(const ffm_dataset & dataset, std::ostream & out) {
             auto start_offset = dataset.index.offsets[ei] - batch_start_offset;
             auto end_offset = dataset.index.offsets[ei+1] - batch_start_offset;
 
-            ffm_float t = predict(batch_features_data + start_offset, batch_features_data + end_offset, norm);
+            ffm_float t = predict(batch_features_data + start_offset, batch_features_data + end_offset, norm, mask);
 
             out << 1/(1+exp(-t)) << std::endl;
         }
