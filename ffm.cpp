@@ -318,12 +318,13 @@ public:
 
     std::string model_name;
 
-    ffm_uint n_epochs;
-    ffm_uint n_threads;
+    uint n_epochs;
+    uint n_threads;
+    uint seed;
 
     bool restricted;
 public:
-    program_options(int ac, char* av[]): desc("Allowed options"), model_name("ffm"), n_epochs(10), n_threads(4) {
+    program_options(int ac, char* av[]): desc("Allowed options"), model_name("ffm"), n_epochs(10), n_threads(4), seed(2017) {
         using namespace boost::program_options;
 
         desc.add_options()
@@ -333,8 +334,9 @@ public:
             ("val", value<std::string>(&val_file_name), "validation dataset file")
             ("test", value<std::string>(&test_file_name), "test dataset file")
             ("pred", value<std::string>(&pred_file_name), "file to save predictions")
-            ("epochs", value<ffm_uint>(&n_epochs), "number of epochs (default 10)")
-            ("threads", value<ffm_uint>(&n_threads), "number of threads (default 4)")
+            ("epochs", value<uint>(&n_epochs), "number of epochs (default 10)")
+            ("threads", value<uint>(&n_threads), "number of threads (default 4)")
+            ("seed", value<uint>(&seed), "random seed")
             ("restricted", "restrict feature interactions to (E+C) * (C+A)")
         ;
 
@@ -389,10 +391,13 @@ void apply(M & model, program_options & opts) {
 int main(int ac, char* av[]) {
     program_options opts(ac, av);
 
+    // Init global state
     omp_set_num_threads(opts.n_threads);
+    rnd.seed(opts.seed);
 
+    // Run model
     if (opts.model_name == "ffm") {
-        ffm_model model(2017, opts.restricted);
+        ffm_model model(opts.seed, opts.restricted);
         apply(model, opts);
     } else {
         throw std::runtime_error(std::string("Unknown model ") + opts.model_name);
