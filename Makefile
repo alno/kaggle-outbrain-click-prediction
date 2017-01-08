@@ -15,8 +15,8 @@ all: $(TARGETS)
 bin/%.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(DFLAG) -MMD -c -o $@ $<
 
-bin/%: bin/%.o bin/ffm-io.o
-	$(CXX) $(CXXFLAGS) -o $@ $< bin/ffm-io.o -lboost_iostreams -lboost_program_options
+bin/%: bin/%.o bin/ffm-io.o bin/ffm-model.o
+	$(CXX) $(CXXFLAGS) -o $@ $< bin/ffm-io.o bin/ffm-model.o -lboost_iostreams -lboost_program_options
 
 -include bin/*.d
 
