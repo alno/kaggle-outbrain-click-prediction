@@ -216,12 +216,21 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     if (stof(rows[8][1]) > 0)
         features.raw(12, 32); // Clicked ad of the similar topic
 
+    // Ad view features from future
 
-    features.raw(13, event.weekday + 50);
-    features.raw(13, event.hour + 70);
+    if (stoi(rows[5][4]) > 0)
+        features.raw(13, 40); // Viewed this ad later
 
-    features.raw(14, 80, pos_time_diff(event.timestamp - ad_doc.publish_timestamp));
-    features.raw(14, 81, time_diff(ev_doc.publish_timestamp - ad_doc.publish_timestamp));
+    if (stoi(rows[5][6]) > 0)
+        features.raw(13, 41); // Viewed this ad doc later
+
+    // Other features
+
+    features.raw(15, event.weekday + 50);
+    features.raw(15, event.hour + 70);
+
+    features.raw(16, 80, pos_time_diff(event.timestamp - ad_doc.publish_timestamp));
+    features.raw(16, 81, time_diff(ev_doc.publish_timestamp - ad_doc.publish_timestamp));
 
     // Similarity features
     /*
@@ -273,7 +282,7 @@ int main() {
     auto data = load_reference_data();
 
     cout << "Generating files..." << endl;
-    generate_files<reference_data, writer>(data, build_filesets(files, features, "_bin_p1"));
+    generate_files<reference_data, writer>(data, build_filesets(files, features, "_bin_f1"));
 
     cout << "Done." << endl;
 }
