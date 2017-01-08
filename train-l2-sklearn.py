@@ -1,17 +1,29 @@
 import pandas as pd
 import numpy as np
 
+import sys
+
 from util.meta import full_split, val_split, val_split_time, test_split_time
 from util import gen_prediction_name, gen_submission, score_sorted
+from util.sklearn_model import SklearnModel
+from util.keras_model import KerasModel
 
 from sklearn.model_selection import GroupKFold
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import log_loss
 
 from scipy.special import logit
 
 
 preds = [
+    '20170108-2008-ffm2-f1-0.68984',
+
+    '20170107-2248-ffm2-p1-0.68876',
+    '20170108-0345-ffm2-p2-0.68762',
+
     '20170106-2000-ffm2-p1-0.68754',
+    '20170106-2050-ffm2-p2-0.68656',
+
     '20170105-2113-ffm2-p1-0.68684',
 
     '20161230-1323-ffm-p1-0.68204',
@@ -23,16 +35,20 @@ preds = [
     '20170106-1339-vw-p1-0.67829',
 ]
 
+models = {
+    'lr': lambda: SklearnModel(LogisticRegression(C=1.0)),
+    'nn': lambda: KerasModel(layers=[100], dropouts=[0.2], n_epoch=10)
+}
 
-def create_model():
-    return LogisticRegression(C=1.0)
+model_name = sys.argv[1]
+model_factory = models[model_name]
 
 
 def y_hash(y):
     return hash(tuple(np.where(y[:200])[0]) + tuple(np.where(y[-200:])[0]))
 
 
-def fit_present_model(train_X, train_y, train_event):
+def fit_present_model(events, train_X, train_y, train_event):
     print "Training present model..."
 
     train_is_present = train_event.isin(events[events['timestamp'] < val_split_time].index).values
@@ -42,25 +58,35 @@ def fit_present_model(train_X, train_y, train_event):
     present_train_g = train_event[train_is_present].values
 
     folds = list(GroupKFold(3).split(present_train_X, present_train_y, present_train_g))
-    scores = []
+    ll_scores = []
+    map_scores = []
 
     for k, (idx_train, idx_test) in enumerate(folds):
-        model = create_model()
-        model.fit(present_train_X[idx_train], present_train_y[idx_train])
+        fold_train_X = present_train_X[idx_train]
+        fold_train_y = present_train_y[idx_train]
 
-        pred = model.predict_proba(present_train_X[idx_test])[:, 1]
-        score = score_sorted(present_train_y[idx_test], pred, present_train_g[idx_test])
+        fold_val_X = present_train_X[idx_test]
+        fold_val_y = present_train_y[idx_test]
+        fold_val_g = present_train_g[idx_test]
 
-        print "    Fold %d score: %.7f" % (k+1, score)
+        model = model_factory()
+        model.fit(fold_train_X, fold_train_y, fold_val_X, fold_val_y, fold_val_g)
 
-        scores.append(score)
+        pred = model.predict(fold_val_X)
 
-    print "  Present score: %.7f +- %.7f" % (np.mean(scores), np.std(scores))
+        ll_scores.append(log_loss(fold_val_y, pred))
+        map_scores.append(score_sorted(fold_val_y, pred, fold_val_g))
 
-    return create_model().fit(present_train_X, present_train_y), np.mean(scores)
+        print "    Fold %d logloss: %.7f, map score: %.7f" % (k+1, ll_scores[-1], map_scores[-1])
 
 
-def fit_future_model(train_X, train_y, train_event):
+
+    print "  Present map score: %.7f +- %.7f" % (np.mean(map_scores), np.std(map_scores))
+
+    return model_factory().fit(present_train_X, present_train_y), np.mean(map_scores)
+
+
+def fit_future_model(events, train_X, train_y, train_event):
     print "Training future model..."
 
     val2_split_time = 1078667779
@@ -72,22 +98,24 @@ def fit_future_model(train_X, train_y, train_event):
     future_train_X = train_X[train_is_future_train].values
     future_train_y = train_y[train_is_future_train].values
 
-    model = create_model()
-    model.fit(future_train_X, future_train_y)
-
     future_val_X = train_X[train_is_future_val].values
     future_val_y = train_y[train_is_future_val].values
     future_val_g = train_event[train_is_future_val].values
 
-    pred = model.predict_proba(future_val_X)[:, 1]
-    score = score_sorted(future_val_y, pred, future_val_g)
+    model = model_factory()
+    model.fit(future_train_X, future_train_y, future_val_X, future_val_y, future_val_g)
 
-    print "  Future score: %.7f" % score
+    pred = model.predict(future_val_X)
+
+    ll_score = log_loss(future_val_y, pred)
+    map_score = score_sorted(future_val_y, pred, future_val_g)
+
+    print "  Future logloss: %.7f, map score: %.7f" % (ll_score, map_score)
 
     future_all_X = train_X[train_is_future_all].values
     future_all_y = train_y[train_is_future_all].values
 
-    return create_model().fit(future_all_X, future_all_y), score
+    return model_factory().fit(future_all_X, future_all_y), map_score
 
 
 def load_x(ds):
@@ -101,10 +129,10 @@ def load_x(ds):
         raise ValueError()
 
     X = []
-    X.append(pd.read_csv('cache/leak_%s.csv.gz' % feature_ds, dtype=np.uint8))
+    X.append((pd.read_csv('cache/leak_%s.csv.gz' % feature_ds, dtype=np.uint8) > 0).astype(np.uint8))
 
     for pi, p in enumerate(preds):
-        X.append(logit(pd.read_pickle('preds/%s-%s.pickle' % (p, pred_ds))[['pred']].rename(columns={'pred': 'p%d' % pi})))
+        X.append(logit(pd.read_pickle('preds/%s-%s.pickle' % (p, pred_ds))[['pred']].rename(columns={'pred': 'p%d' % pi}).clip(lower=1e-12, upper=1-1e-12)))
 
     return pd.concat(X, axis=1)
 
@@ -129,10 +157,10 @@ events = pd.read_csv("../input/events.csv.gz", dtype=np.int32, index_col=0, usec
 
 train_data = load_train_data()
 
-present_model, present_score = fit_present_model(*train_data)
-future_model, future_score = fit_future_model(*train_data)
+present_model, present_score = fit_present_model(events, *train_data)
+future_model, future_score = fit_future_model(events, *train_data)
 
-score = (present_score + future_score) / 2
+score = present_score * 0.47671335657020786 + future_score * 0.5232866434297921
 
 print "Estimated score: %.7f" % score
 
@@ -156,10 +184,10 @@ del events
 
 print "  Predicting..."
 
-name = gen_prediction_name('l2-lr', score)
+name = gen_prediction_name('l2-%s' % model_name, score)
 
-test_p.loc[test_is_present, 'pred'] = present_model.predict_proba(test_X[test_is_present])[:, 1]
-test_p.loc[test_is_future, 'pred'] = future_model.predict_proba(test_X[test_is_future])[:, 1]
+test_p.loc[test_is_present, 'pred'] = present_model.predict(test_X[test_is_present])
+test_p.loc[test_is_future, 'pred'] = future_model.predict(test_X[test_is_future])
 
 test_p[['pred']].to_pickle('preds/%s-test.pickle' % name)
 
