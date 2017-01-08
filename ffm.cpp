@@ -55,6 +55,8 @@ std::default_random_engine rnd(2017);
 
 ffm_float * weights;
 
+ffm_float * linear_weights;
+
 ffm_float bias_w = 0;
 ffm_float bias_wg = 1;
 
@@ -78,6 +80,9 @@ struct ffm_dataset {
 
 
 ffm_float predict(const ffm_feature * start, const ffm_feature * end, ffm_float norm, uint64_t * mask) {
+    ffm_float linear_total = 0;
+    ffm_float linear_norm = end - start;
+
     __m128 xmm_total = _mm_set1_ps(bias_w);
 
     ffm_uint i = 0;
@@ -86,6 +91,8 @@ ffm_float predict(const ffm_feature * start, const ffm_feature * end, ffm_float 
         ffm_uint index_a = fa->index &  ffm_hash_mask;
         ffm_uint field_a = fa->index >> ffm_hash_bits;
         ffm_float value_a = fa->value;
+
+        linear_total += value_a * linear_weights[index_a*2] / linear_norm;
 
         if (field_a < min_a_field)
             continue;
@@ -125,11 +132,13 @@ ffm_float predict(const ffm_feature * start, const ffm_feature * end, ffm_float 
 
     _mm_store_ss(&total, xmm_total);
 
-    return total;
+    return total + linear_total;
 }
 
 
 void update(const ffm_feature * start, const ffm_feature * end, ffm_float norm, ffm_float kappa, uint64_t * mask) {
+    ffm_float linear_norm = end - start;
+
     __m256 xmm_eta = _mm256_set1_ps(eta);
     __m256 xmm_lambda = _mm256_set1_ps(lambda);
 
@@ -139,6 +148,12 @@ void update(const ffm_feature * start, const ffm_feature * end, ffm_float norm, 
         ffm_uint index_a = fa->index &  ffm_hash_mask;
         ffm_uint field_a = fa->index >> ffm_hash_bits;
         ffm_float value_a = fa->value;
+
+        ffm_float g = lambda * linear_weights[index_a*2] + kappa * value_a / linear_norm;
+        ffm_float wg = linear_weights[index_a*2 + 1] + g*g;
+
+        linear_weights[index_a*2] -= eta * g / sqrt(wg);
+        linear_weights[index_a*2 + 1] = wg;
 
         if (field_a < min_a_field)
             continue;
@@ -464,10 +479,22 @@ void init_weights(ffm_float * weights, ffm_uint n, D gen) {
 }
 
 
+void init_linear_weights(ffm_float * weights, ffm_uint n) {
+    ffm_float * w = weights;
+
+    for(ffm_uint i = 0; i < n; i++) {
+        *w++ = 0;
+        *w++ = 1;
+    }
+}
+
+
 void init_model() {
     weights = malloc_aligned_float(n_features * n_fields * n_dim_aligned * 2);
+    linear_weights = malloc_aligned_float(n_features * 2);
 
     init_weights(weights, n_features * n_fields, std::uniform_real_distribution<ffm_float>(0.0, 1.0/sqrt(n_dim)));
+    init_linear_weights(linear_weights, n_features);
 }
 
 
