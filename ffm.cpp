@@ -303,9 +303,9 @@ ffm_double train_on_dataset(const ffm_dataset & dataset) {
     }
 
     clock_t end = clock();
-    double elapsed = double(end - begin) / CLOCKS_PER_SEC;
+    int elapsed = (end - begin) / CLOCKS_PER_SEC;
 
-    std::cout << cnt << " examples processed in " << elapsed << " seconds, loss = " << (loss / cnt) << std::endl;
+    std::cout << cnt << " examples processed in " << elapsed << " seconds, loss = " << std::fixed << std::setprecision(5) << (loss / cnt) << std::endl;
 
     return loss;
 }
@@ -409,9 +409,9 @@ ffm_double evaluate_on_dataset(const ffm_dataset & dataset) {
     ffm_double map = compute_map(dataset.index, predictions);
 
     clock_t end = clock();
-    double elapsed = double(end - begin) / CLOCKS_PER_SEC;
+    int elapsed = (end - begin) / CLOCKS_PER_SEC;
 
-    std::cout << cnt << " examples processed in " << elapsed << " seconds, loss = " << (loss / cnt) << ", map = " << map << std::endl;
+    std::cout << cnt << " examples processed in " << elapsed << " seconds, loss = " << std::fixed << std::setprecision(5) << (loss / cnt) << ", map = " << map << std::endl;
 
     return loss;
 }
@@ -456,7 +456,7 @@ void predict_on_dataset(const ffm_dataset & dataset, std::ostream & out) {
     }
 
     clock_t end = clock();
-    double elapsed = double(end - begin) / CLOCKS_PER_SEC;
+    int elapsed = (end - begin) / CLOCKS_PER_SEC;
 
     std::cout << cnt << " examples processed in " << elapsed << " seconds" << std::endl;
 }
