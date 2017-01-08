@@ -48,3 +48,22 @@ void generate_files(const D & data, const std::vector<std::pair<std::vector<std:
         cout << "done in " << elapsed << " seconds" << endl;
     };
 }
+
+auto build_filesets(const std::vector<std::pair<std::string, std::string>> & files, const std::vector<std::string> & features, const std::string & out_suffix) {
+    using namespace std;
+
+    vector<pair<vector<string>, string>> filesets;
+
+    for (auto fi = files.begin(); fi != files.end(); ++ fi) {
+        vector<string> inputs;
+
+        inputs.push_back(fi->first);
+
+        for (auto ffi = features.begin(); ffi != features.end(); ++ ffi)
+            inputs.push_back(string("cache/") + (*ffi) + string("_") + fi->second + string(".csv.gz"));
+
+        filesets.push_back(make_pair(inputs, string("cache/") + fi->second + out_suffix));
+    }
+
+    return filesets;
+}

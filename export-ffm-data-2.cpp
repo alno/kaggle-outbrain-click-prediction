@@ -305,25 +305,6 @@ void writer::finish() {
     ffm_write_index(file_name + ".index", index);
 }
 
-auto build_filesets() {
-    using namespace std;
-
-    vector<pair<vector<string>, string>> filesets;
-
-    for (auto fi = files.begin(); fi != files.end(); ++ fi) {
-        vector<string> inputs;
-
-        inputs.push_back(fi->first);
-
-        for (auto ffi = features.begin(); ffi != features.end(); ++ ffi)
-            inputs.push_back(string("cache/") + (*ffi) + string("_") + fi->second + string(".csv.gz"));
-
-        filesets.push_back(make_pair(inputs, string("cache/") + fi->second + string("_ffm_2")));
-    }
-
-    return filesets;
-}
-
 int main() {
     using namespace std;
 
@@ -332,7 +313,7 @@ int main() {
 
 
     cout << "Generating files..." << endl;
-    generate_files<reference_data, writer>(data, build_filesets());
+    generate_files<reference_data, writer>(data, build_filesets(files, features, "_fmm_2"));
 
     cout << "Done." << endl;
 }
