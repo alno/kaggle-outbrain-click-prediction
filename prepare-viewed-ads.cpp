@@ -28,9 +28,10 @@ std::unordered_multimap<int, std::pair<int, float>> document_categories;
 std::unordered_multimap<int, std::pair<int, float>> document_topics;
 
 
+template <typename C>
 class basic_writer {
-    std::unordered_map<std::pair<int, int>, std::pair<uint8_t, uint8_t>> ad_counts;
-    std::unordered_map<std::pair<int, int>, std::pair<uint8_t, uint8_t>> ad_doc_counts;
+    std::unordered_map<std::pair<int, int>, std::pair<C, C>> ad_counts;
+    std::unordered_map<std::pair<int, int>, std::pair<C, C>> ad_doc_counts;
 public:
 
     std::string get_header() {
@@ -45,10 +46,10 @@ public:
         auto & ad_cnt = ad_counts[make_pair(group_id, ad_id)];
         auto & ad_doc_cnt = ad_doc_counts[make_pair(group_id, doc_id)];
 
-        out << int(ad_cnt.first) << ","
-            << int(ad_cnt.second) << ","
-            << int(ad_doc_cnt.first) << ","
-            << int(ad_doc_cnt.second) << endl;
+        out << ad_cnt.first << ","
+            << ad_cnt.second << ","
+            << ad_doc_cnt.first << ","
+            << ad_doc_cnt.second << endl;
     }
 
 
@@ -60,7 +61,7 @@ public:
         auto & ad_cnt = ad_counts[make_pair(group_id, ad_id)];
         auto & ad_doc_cnt = ad_doc_counts[make_pair(group_id, doc_id)];
 
-        if (int(ad_cnt.first) > 250 || int(ad_doc_cnt.first) > 250)
+        if (ad_cnt.first > numeric_limits<C>::max() - 10 || ad_doc_cnt.first > numeric_limits<C>::max() - 10)
             throw std::logic_error("Overflow is near");
 
         ++ ad_cnt.first;
@@ -75,9 +76,10 @@ public:
 };
 
 
+template <typename C>
 class source_writer {
-    std::unordered_map<std::pair<int, int>, std::pair<uint8_t, uint8_t>> ad_pub_counts;
-    std::unordered_map<std::pair<int, int>, std::pair<uint8_t, uint8_t>> ad_src_counts;
+    std::unordered_map<std::pair<int, int>, std::pair<C, C>> ad_pub_counts;
+    std::unordered_map<std::pair<int, int>, std::pair<C, C>> ad_src_counts;
 public:
 
     std::string get_header() {
@@ -93,10 +95,10 @@ public:
         auto & ad_pub_cnt = ad_pub_counts[make_pair(group_id, doc.publisher_id)];
         auto & ad_src_cnt = ad_src_counts[make_pair(group_id, doc.source_id)];
 
-        out << int(ad_pub_cnt.first) << ","
-            << int(ad_pub_cnt.second) << ","
-            << int(ad_src_cnt.first) << ","
-            << int(ad_src_cnt.second) << endl;
+        out << ad_pub_cnt.first << ","
+            << ad_pub_cnt.second << ","
+            << ad_src_cnt.first << ","
+            << ad_src_cnt.second << endl;
     }
 
     void update(int group_id, int ad_id, int clicked) {
@@ -108,7 +110,7 @@ public:
         auto & ad_pub_cnt = ad_pub_counts[make_pair(group_id, doc.publisher_id)];
         auto & ad_src_cnt = ad_src_counts[make_pair(group_id, doc.source_id)];
 
-        if (int(ad_pub_cnt.first) > 250 || int(ad_src_cnt.first) > 250)
+        if (ad_pub_cnt.first > numeric_limits<C>::max() - 10 || ad_src_cnt.first > numeric_limits<C>::max() - 10)
             throw std::logic_error("Overflow is near");
 
         ++ ad_pub_cnt.first;
@@ -123,9 +125,10 @@ public:
 };
 
 
+template <typename C>
 class campaign_writer {
-    std::unordered_map<std::pair<int, int>, std::pair<uint8_t, uint8_t>> ad_campaign_counts;
-    std::unordered_map<std::pair<int, int>, std::pair<uint8_t, uint8_t>> ad_advertiser_counts;
+    std::unordered_map<std::pair<int, int>, std::pair<C, C>> ad_campaign_counts;
+    std::unordered_map<std::pair<int, int>, std::pair<C, C>> ad_advertiser_counts;
 public:
 
     std::string get_header() {
@@ -140,10 +143,10 @@ public:
         auto & ad_cmp_cnt = ad_campaign_counts[make_pair(group_id, ad.campaign_id)];
         auto & ad_adv_cnt = ad_advertiser_counts[make_pair(group_id, ad.advertiser_id)];
 
-        out << int(ad_cmp_cnt.first) << ","
-            << int(ad_cmp_cnt.second) << ","
-            << int(ad_adv_cnt.first) << ","
-            << int(ad_adv_cnt.second) << endl;
+        out << ad_cmp_cnt.first << ","
+            << ad_cmp_cnt.second << ","
+            << ad_adv_cnt.first << ","
+            << ad_adv_cnt.second << endl;
     }
 
     void update(int group_id, int ad_id, int clicked) {
@@ -154,7 +157,7 @@ public:
         auto & ad_cmp_cnt = ad_campaign_counts[make_pair(group_id, ad.campaign_id)];
         auto & ad_adv_cnt = ad_advertiser_counts[make_pair(group_id, ad.advertiser_id)];
 
-        if (int(ad_cmp_cnt.first) > 250 || int(ad_adv_cnt.first) > 250)
+        if (ad_cmp_cnt.first > numeric_limits<C>::max() - 10 || ad_adv_cnt.first > numeric_limits<C>::max() - 10)
             throw std::logic_error("Overflow is near");
 
         ++ ad_cmp_cnt.first;
@@ -169,9 +172,10 @@ public:
 };
 
 
+template <typename C>
 class source_ctr_writer {
-    std::unordered_map<std::pair<int, int>, std::pair<uint8_t, uint8_t>> ad_pub_counts;
-    std::unordered_map<std::pair<int, int>, std::pair<uint8_t, uint8_t>> ad_src_counts;
+    std::unordered_map<std::pair<int, int>, std::pair<C, C>> ad_pub_counts;
+    std::unordered_map<std::pair<int, int>, std::pair<C, C>> ad_src_counts;
 public:
 
     std::string get_header() {
@@ -206,7 +210,7 @@ public:
         auto & ad_pub_cnt = ad_pub_counts[make_pair(group_id, doc.publisher_id)];
         auto & ad_src_cnt = ad_src_counts[make_pair(group_id, doc.source_id)];
 
-        if (int(ad_pub_cnt.first) > 250 || int(ad_src_cnt.first) > 250)
+        if (ad_pub_cnt.first > numeric_limits<C>::max() - 10 || ad_src_cnt.first > numeric_limits<C>::max() - 10)
             throw std::logic_error("Overflow is near");
 
         if (clicked >= 0) {
@@ -463,15 +467,19 @@ int main() {
     document_topics = read_multi_map("../input/documents_topics.csv.gz", read_document_annotation);
 
     for (uint ofs = 0; ofs < filesets.size(); ofs += 2) {
-        generate<basic_writer>(uid_extractor, "viewed_ads", ofs);
-        generate<source_writer>(uid_extractor, "viewed_ad_srcs", ofs);
-        generate<campaign_writer>(uid_extractor, "viewed_ad_campaigns", ofs);
+        generate<basic_writer<uint8_t>>(uid_extractor, "viewed_ads", ofs);
+        generate<source_writer<uint8_t>>(uid_extractor, "viewed_ad_srcs", ofs);
+        generate<campaign_writer<uint8_t>>(uid_extractor, "viewed_ad_campaigns", ofs);
         generate<category_writer>(uid_extractor, "viewed_ad_categories", ofs);
         generate<topic_writer>(uid_extractor, "viewed_ad_topics", ofs);
 
-        generate<source_ctr_writer>(uid_extractor, "viewed_ad_src_ctrs", ofs);
+        generate<source_ctr_writer<uint8_t>>(uid_extractor, "viewed_ad_src_ctrs", ofs);
 
+        generate<basic_writer<uint>>(g2_extractor, "g2_viewed_ads", ofs);
+        generate<source_writer<uint>>(g2_extractor, "g2_viewed_ad_srcs", ofs);
+        generate<campaign_writer<uint>>(g2_extractor, "g2_viewed_ad_campaigns", ofs);
         generate<category_writer>(g2_extractor, "g2_viewed_ad_categories", ofs);
+        generate<topic_writer>(g2_extractor, "g2_viewed_ad_topics", ofs);
     }
 
     cout << "Done." << endl;
