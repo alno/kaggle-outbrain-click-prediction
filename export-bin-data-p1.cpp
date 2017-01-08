@@ -272,9 +272,8 @@ int main() {
     cout << "Loading reference data..." << endl;
     auto data = load_reference_data();
 
-
     cout << "Generating files..." << endl;
-    generate_files<reference_data, writer>(data, build_filesets(files, features, "_fmm_2"));
+    generate_files<reference_data, writer>(data, build_filesets(files, features, "_bin_p1"));
 
     cout << "Done." << endl;
 }

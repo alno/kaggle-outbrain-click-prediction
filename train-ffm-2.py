@@ -9,10 +9,10 @@ from util import gen_prediction_name, gen_submission, score_prediction, print_an
 
 
 def fit_predict(profile, split, split_name):
-    train_file = 'cache/%s_train_ffm_2' % split_name
-    pred_file = 'cache/%s_test_ffm_2' % split_name
-
     opts = profile['options']
+
+    train_file = 'cache/%s_train_bin_%s' % (split_name, opts['dataset'])
+    pred_file = 'cache/%s_test_bin_%s' % (split_name, opts['dataset'])
 
     if split_name == "val":
         opts += " --val %s" % pred_file
@@ -28,10 +28,12 @@ def fit_predict(profile, split, split_name):
 profiles = {
     'p1': {
         'options': "--epochs 7",
+        'dataset': "p1",
     },
 
-    'p2': {
+    'p1r': {
         'options': "--epochs 7 --restricted",
+        'dataset': "p1",
     },
 }
 
