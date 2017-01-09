@@ -37,7 +37,7 @@ preds = [
 
 models = {
     'lr': lambda: SklearnModel(LogisticRegression(C=1.0)),
-    'nn': lambda: KerasModel(layers=[100], dropouts=[0.2], n_epoch=10)
+    'nn': lambda: KerasModel(batch_size=128, layers=[40, 10], dropouts=[0.3, 0.1], n_epoch=1)
 }
 
 model_name = sys.argv[1]
@@ -74,12 +74,10 @@ def fit_present_model(events, train_X, train_y, train_event):
 
         pred = model.predict(fold_val_X)
 
-        ll_scores.append(log_loss(fold_val_y, pred))
+        ll_scores.append(log_loss(fold_val_y, pred, eps=1e-7))
         map_scores.append(score_sorted(fold_val_y, pred, fold_val_g))
 
         print "    Fold %d logloss: %.7f, map score: %.7f" % (k+1, ll_scores[-1], map_scores[-1])
-
-
 
     print "  Present map score: %.7f +- %.7f" % (np.mean(map_scores), np.std(map_scores))
 
@@ -107,7 +105,7 @@ def fit_future_model(events, train_X, train_y, train_event):
 
     pred = model.predict(future_val_X)
 
-    ll_score = log_loss(future_val_y, pred)
+    ll_score = log_loss(future_val_y, pred, eps=1e-7)
     map_score = score_sorted(future_val_y, pred, future_val_g)
 
     print "  Future logloss: %.7f, map score: %.7f" % (ll_score, map_score)

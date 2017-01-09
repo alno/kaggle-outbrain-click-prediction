@@ -1,9 +1,10 @@
-
 from keras.models import Sequential
 from keras.layers import Dense, Dropout
 from keras.layers.advanced_activations import PReLU
 from keras.layers.normalization import BatchNormalization
 from keras import regularizers
+
+from sklearn.preprocessing import StandardScaler
 
 
 def regularizer(params):
@@ -36,7 +37,7 @@ def nn_mlp_2(input_shape, params):
         if 'dropouts' in params:
             model.add(Dropout(params['dropouts'][i]))
 
-    model.add(Dense(1, init='he_normal'))
+    model.add(Dense(1, init='glorot_normal', activation='sigmoid'))
 
     return model
 
@@ -51,15 +52,24 @@ class KerasModel(object):
         self.model = self.arch((train_X.shape[1],), self.params)
         self.model.compile(optimizer='adadelta', loss='binary_crossentropy')
 
+        self.scaler = StandardScaler()
+
+        train_X = self.scaler.fit_transform(train_X)
+
+        if eval_X is not None:
+            eval_X = self.scaler.transform(eval_X)
+
         callbacks = []
 
         self.model.fit(
             x=train_X, y=train_y,
-            batch_size=32, nb_epoch=self.params['n_epoch'],
+            batch_size=self.params.get('batch_size', 32), nb_epoch=self.params['n_epoch'],
             validation_data=(None if eval_X is None else (eval_X, eval_y)),
             verbose=1, callbacks=callbacks)
 
         return self
 
     def predict(self, test_X):
-        return self.model.predict_proba(test_X)[:, 1]
+        test_X = self.scaler.transform(test_X)
+
+        return self.model.predict(test_X).flatten()
