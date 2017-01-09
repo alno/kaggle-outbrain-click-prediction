@@ -56,9 +56,9 @@ args = parser.parse_args()
 profile = profiles[args.profile]
 
 
-if not os.path.exists('cache/val_train_ffm_2.index') or args.rewrite_cache:
+if not os.path.exists('cache/val_train_bin_%s.index' % profile['dataset']) or args.rewrite_cache:
     print "Generating data..."
-    os.system("bin/export-ffm-data-2")
+    os.system("bin/export-bin-data-%s" % profile['dataset'])
 
 
 ## Validation

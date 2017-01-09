@@ -40,9 +40,11 @@ template <typename C>
 struct counts {
     C past;
     C past_pos;
+    C past_all;
 
     C future;
     C future_pos;
+    C future_all;
 };
 
 
@@ -52,7 +54,7 @@ class group_writer {
     std::unordered_map<int, counts<C>> grp_counts;
 public:
     std::string get_header() {
-        return "grp_past_views,grp_past_clicks,grp_future_views,grp_future_clicks";
+        return "grp_past_views,grp_past_clicks,grp_past_all_views,grp_future_views,grp_future_clicks,grp_future_all_views";
     }
 
     void write(std::ostream & out, int group_id, int ad_id) {
@@ -62,17 +64,22 @@ public:
 
         out << int(cnt.past) << ","
             << int(cnt.past_pos) << ","
+            << int(cnt.past_all) << ","
             << int(cnt.future) << ","
-            << int(cnt.future_pos) << endl;
+            << int(cnt.future_pos) << ","
+            << int(cnt.future_all) << endl;
     }
 
     void update_past(int group_id, int ad_id, int clicked) {
         auto & cnt = grp_counts[group_id];
 
-        if (cnt.past == std::numeric_limits<C>::max())
+        if (cnt.past_all == std::numeric_limits<C>::max())
             throw std::logic_error("Positive overflow");
 
-        ++ cnt.past;
+        ++ cnt.past_all;
+
+        if (clicked >= 0)
+            ++ cnt.past;
 
         if (clicked > 0)
             ++ cnt.past_pos;
@@ -81,12 +88,15 @@ public:
     void update_future(int group_id, int ad_id, int clicked, int sign) {
         auto & cnt = grp_counts[group_id];
 
-        if (sign > 0 && cnt.future == std::numeric_limits<C>::max())
+        if (sign > 0 && cnt.future_all == std::numeric_limits<C>::max())
             throw std::logic_error("Positive overflow");
-        else if (sign < 0 && cnt.future == std::numeric_limits<C>::min())
+        else if (sign < 0 && cnt.future_all == std::numeric_limits<C>::min())
             throw std::logic_error("Negative overflow");
 
-        cnt.future += sign;
+        cnt.future_all += sign;
+
+        if (clicked >= 0)
+            cnt.future += sign;
 
         if (clicked > 0)
             cnt.future_pos += sign;
@@ -100,7 +110,7 @@ class ad_writer {
     std::unordered_map<std::pair<int, int>, counts<C>> ad_doc_counts;
 public:
     std::string get_header() {
-        return "ad_past_views,ad_past_clicks,ad_doc_past_views,ad_doc_past_clicks,ad_future_views,ad_future_clicks,ad_doc_future_views,ad_doc_future_clicks";
+        return "ad_past_views,ad_past_clicks,ad_past_all_views,ad_doc_past_views,ad_doc_past_clicks,ad_doc_past_all_views,ad_future_views,ad_future_clicks,ad_future_all_views,ad_doc_future_views,ad_doc_future_clicks,ad_doc_future_all_views";
     }
 
     void write(std::ostream & out, int group_id, int ad_id) {
@@ -113,12 +123,16 @@ public:
 
         out << int(ad_cnt.past) << ","
             << int(ad_cnt.past_pos) << ","
+            << int(ad_cnt.past_all) << ","
             << int(ad_doc_cnt.past) << ","
             << int(ad_doc_cnt.past_pos) << ","
+            << int(ad_doc_cnt.past_all) << ","
             << int(ad_cnt.future) << ","
             << int(ad_cnt.future_pos) << ","
+            << int(ad_cnt.future_all) << ","
             << int(ad_doc_cnt.future) << ","
-            << int(ad_doc_cnt.future_pos) << endl;
+            << int(ad_doc_cnt.future_pos) << ","
+            << int(ad_doc_cnt.future_all) << endl;
     }
 
     void update_past(int group_id, int ad_id, int clicked) {
@@ -129,11 +143,16 @@ public:
         auto & ad_cnt = ad_counts[make_pair(group_id, ad_id)];
         auto & ad_doc_cnt = ad_doc_counts[make_pair(group_id, doc_id)];
 
-        if (ad_cnt.past == numeric_limits<C>::max() || ad_doc_cnt.past == numeric_limits<C>::max())
+        if (ad_cnt.past_all == numeric_limits<C>::max() || ad_doc_cnt.past_all == numeric_limits<C>::max())
             throw std::logic_error("Positive overflow");
 
-        ++ ad_cnt.past;
-        ++ ad_doc_cnt.past;
+        ++ ad_cnt.past_all;
+        ++ ad_doc_cnt.past_all;
+
+        if (clicked >= 0) {
+            ++ ad_cnt.past;
+            ++ ad_doc_cnt.past;
+        }
 
         if (clicked > 0) {
             ++ ad_cnt.past_pos;
@@ -149,13 +168,18 @@ public:
         auto & ad_cnt = ad_counts[make_pair(group_id, ad_id)];
         auto & ad_doc_cnt = ad_doc_counts[make_pair(group_id, doc_id)];
 
-        if (sign > 0 && (ad_cnt.future == numeric_limits<C>::max() || ad_doc_cnt.future == numeric_limits<C>::max()))
+        if (sign > 0 && (ad_cnt.future_all == numeric_limits<C>::max() || ad_doc_cnt.future_all == numeric_limits<C>::max()))
             throw std::logic_error("Positive overflow");
-        else if (sign < 0 && (ad_cnt.future == numeric_limits<C>::min() || ad_doc_cnt.future == numeric_limits<C>::min()))
+        else if (sign < 0 && (ad_cnt.future_all == numeric_limits<C>::min() || ad_doc_cnt.future_all == numeric_limits<C>::min()))
             throw std::logic_error("Negative overflow");
 
-        ad_cnt.future += sign;
-        ad_doc_cnt.future += sign;
+        ad_cnt.future_all += sign;
+        ad_doc_cnt.future_all += sign;
+
+        if (clicked >= 0) {
+            ad_cnt.future += sign;
+            ad_doc_cnt.future += sign;
+        }
 
         if (clicked > 0) {
             ad_cnt.future_pos += sign;
@@ -171,7 +195,7 @@ class source_writer {
     std::unordered_map<std::pair<int, int>, counts<C>> ad_src_counts;
 public:
     std::string get_header() {
-        return "pub_past_views,pub_past_clicks,src_past_views,src_past_clicks,pub_future_views,pub_future_clicks,src_future_views,src_future_clicks";
+        return "pub_past_views,pub_past_clicks,pub_past_all_views,src_past_views,src_past_clicks,src_past_all_views,pub_future_views,pub_future_clicks,pub_future_all_views,src_future_views,src_future_clicks,src_future_all_views";
     }
 
     void write(std::ostream & out, int group_id, int ad_id) {
@@ -185,12 +209,16 @@ public:
 
         out << int(ad_pub_cnt.past) << ","
             << int(ad_pub_cnt.past_pos) << ","
+            << int(ad_pub_cnt.past_all) << ","
             << int(ad_src_cnt.past) << ","
             << int(ad_src_cnt.past_pos) << ","
+            << int(ad_src_cnt.past_all) << ","
             << int(ad_pub_cnt.future) << ","
             << int(ad_pub_cnt.future_pos) << ","
+            << int(ad_pub_cnt.future_all) << ","
             << int(ad_src_cnt.future) << ","
-            << int(ad_src_cnt.future_pos) << endl;
+            << int(ad_src_cnt.future_pos) << ","
+            << int(ad_src_cnt.future_all) << endl;
     }
 
     void update_past(int group_id, int ad_id, int clicked) {
@@ -202,11 +230,16 @@ public:
         auto & ad_pub_cnt = ad_pub_counts[make_pair(group_id, doc.publisher_id)];
         auto & ad_src_cnt = ad_src_counts[make_pair(group_id, doc.source_id)];
 
-        if (ad_pub_cnt.past == numeric_limits<C>::max() || ad_src_cnt.past == numeric_limits<C>::max())
+        if (ad_pub_cnt.past_all == numeric_limits<C>::max() || ad_src_cnt.past_all == numeric_limits<C>::max())
             throw std::logic_error("Positive overflow");
 
-        ++ ad_pub_cnt.past;
-        ++ ad_src_cnt.past;
+        ++ ad_pub_cnt.past_all;
+        ++ ad_src_cnt.past_all;
+
+        if (clicked >= 0) {
+            ++ ad_pub_cnt.past;
+            ++ ad_src_cnt.past;
+        }
 
         if (clicked > 0) {
             ++ ad_pub_cnt.past_pos;
@@ -223,13 +256,18 @@ public:
         auto & ad_pub_cnt = ad_pub_counts[make_pair(group_id, doc.publisher_id)];
         auto & ad_src_cnt = ad_src_counts[make_pair(group_id, doc.source_id)];
 
-        if (sign > 0 && (ad_pub_cnt.future == numeric_limits<C>::max() || ad_src_cnt.future == numeric_limits<C>::max()))
+        if (sign > 0 && (ad_pub_cnt.future_all == numeric_limits<C>::max() || ad_src_cnt.future_all == numeric_limits<C>::max()))
             throw std::logic_error("Positive overflow");
-        else if (sign < 0 && (ad_pub_cnt.future == numeric_limits<C>::min() || ad_src_cnt.future == numeric_limits<C>::min()))
+        else if (sign < 0 && (ad_pub_cnt.future_all == numeric_limits<C>::min() || ad_src_cnt.future_all == numeric_limits<C>::min()))
             throw std::logic_error("Negative overflow");
 
-        ad_pub_cnt.future += sign;
-        ad_src_cnt.future += sign;
+        ad_pub_cnt.future_all += sign;
+        ad_src_cnt.future_all += sign;
+
+        if (clicked >= 0) {
+            ad_pub_cnt.future += sign;
+            ad_src_cnt.future += sign;
+        }
 
         if (clicked > 0) {
             ad_pub_cnt.future_pos += sign;
@@ -244,7 +282,7 @@ class campaign_writer {
     std::unordered_map<std::pair<int, int>, counts<C>> ad_advertiser_counts;
 public:
     std::string get_header() {
-        return "past_cmp_views,past_cmp_clicks,past_adv_views,past_adv_clicks,future_cmp_views,future_cmp_clicks,future_adv_views,future_adv_clicks";
+        return "cmp_past_views,cmp_past_clicks,cmp_past_all_views,adv_past_views,adv_past_clicks,adv_past_all_views,cmp_future_views,cmp_future_clicks,cmp_future_all_views,adv_future_views,adv_future_clicks,adv_future_all_views";
     }
 
     void write(std::ostream & out, int group_id, int ad_id) {
@@ -257,12 +295,16 @@ public:
 
         out << int(ad_cmp_cnt.past) << ","
             << int(ad_cmp_cnt.past_pos) << ","
+            << int(ad_cmp_cnt.past_all) << ","
             << int(ad_adv_cnt.past) << ","
             << int(ad_adv_cnt.past_pos) << ","
+            << int(ad_adv_cnt.past_all) << ","
             << int(ad_cmp_cnt.future) << ","
             << int(ad_cmp_cnt.future_pos) << ","
+            << int(ad_cmp_cnt.future_all) << ","
             << int(ad_adv_cnt.future) << ","
-            << int(ad_adv_cnt.future_pos) << endl;
+            << int(ad_adv_cnt.future_pos) << ","
+            << int(ad_adv_cnt.future_all) << endl;
     }
 
     void update_past(int group_id, int ad_id, int clicked) {
@@ -273,11 +315,16 @@ public:
         auto & ad_cmp_cnt = ad_campaign_counts[make_pair(group_id, ad.campaign_id)];
         auto & ad_adv_cnt = ad_advertiser_counts[make_pair(group_id, ad.advertiser_id)];
 
-        if (ad_cmp_cnt.past == numeric_limits<C>::max() || ad_adv_cnt.past == numeric_limits<C>::max())
+        if (ad_cmp_cnt.past_all == numeric_limits<C>::max() || ad_adv_cnt.past_all == numeric_limits<C>::max())
             throw std::logic_error("Positive overflow");
 
-        ++ ad_cmp_cnt.past;
-        ++ ad_adv_cnt.past;
+        ++ ad_cmp_cnt.past_all;
+        ++ ad_adv_cnt.past_all;
+
+        if (clicked >= 0) {
+            ++ ad_cmp_cnt.past;
+            ++ ad_adv_cnt.past;
+        }
 
         if (clicked > 0) {
             ++ ad_cmp_cnt.past_pos;
@@ -293,13 +340,18 @@ public:
         auto & ad_cmp_cnt = ad_campaign_counts[make_pair(group_id, ad.campaign_id)];
         auto & ad_adv_cnt = ad_advertiser_counts[make_pair(group_id, ad.advertiser_id)];
 
-        if (sign > 0 && (ad_cmp_cnt.future == numeric_limits<C>::max() || ad_adv_cnt.future == numeric_limits<C>::max()))
+        if (sign > 0 && (ad_cmp_cnt.future_all == numeric_limits<C>::max() || ad_adv_cnt.future_all == numeric_limits<C>::max()))
             throw std::logic_error("Positive overflow");
-        else if (sign < 0 && (ad_cmp_cnt.future == numeric_limits<C>::min() || ad_adv_cnt.future == numeric_limits<C>::min()))
+        else if (sign < 0 && (ad_cmp_cnt.future_all == numeric_limits<C>::min() || ad_adv_cnt.future_all == numeric_limits<C>::min()))
             throw std::logic_error("Negative overflow");
 
-        ad_cmp_cnt.future += sign;
-        ad_adv_cnt.future += sign;
+        ad_cmp_cnt.future_all += sign;
+        ad_adv_cnt.future_all += sign;
+
+        if (clicked >= 0) {
+            ad_cmp_cnt.future += sign;
+            ad_adv_cnt.future += sign;
+        }
 
         if (clicked > 0) {
             ad_cmp_cnt.future_pos += sign;
@@ -312,7 +364,7 @@ class category_writer {
     std::unordered_map<std::pair<int, int>, counts<float>> ad_cat_counts;
 public:
     std::string get_header() {
-        return "cat_past_views,cat_past_clicks,cat_future_views,cat_future_clicks";
+        return "cat_past_views,cat_past_clicks,cat_past_all_views,cat_future_views,cat_future_clicks,cat_future_all_views";
     }
 
     void write(std::ostream & out, int group_id, int ad_id) {
@@ -323,23 +375,30 @@ public:
 
         float cat_past_views = 0;
         float cat_past_clicks = 0;
+        float cat_past_all_views = 0;
+
         float cat_future_views = 0;
         float cat_future_clicks = 0;
+        float cat_future_all_views = 0;
 
         for (auto it = doc_categories.first; it != doc_categories.second; ++ it) {
             auto & ad_cat_cnt = ad_cat_counts[make_pair(group_id, it->second.first)];
 
             cat_past_views += ad_cat_cnt.past * it->second.second;
             cat_past_clicks += ad_cat_cnt.past_pos * it->second.second;
+            cat_past_all_views += ad_cat_cnt.past_all * it->second.second;
 
             cat_future_views += ad_cat_cnt.future * it->second.second;
             cat_future_clicks += ad_cat_cnt.future_pos * it->second.second;
+            cat_future_all_views += ad_cat_cnt.future_all * it->second.second;
         }
 
         out << cat_past_views << ","
             << cat_past_clicks << ","
+            << cat_past_all_views << ","
             << cat_future_views << ","
-            << cat_future_clicks << endl;
+            << cat_future_clicks << ","
+            << cat_future_all_views << endl;
     }
 
     void update_past(int group_id, int ad_id, int clicked) {
@@ -351,7 +410,10 @@ public:
         for (auto it = doc_categories.first; it != doc_categories.second; ++ it) {
             auto & ad_cat_cnt = ad_cat_counts[make_pair(group_id, it->second.first)];
 
-            ad_cat_cnt.past += it->second.second;
+            ad_cat_cnt.past_all += it->second.second;
+
+            if (clicked >= 0)
+                ad_cat_cnt.past += it->second.second;
 
             if (clicked > 0)
                 ad_cat_cnt.past_pos += it->second.second;
@@ -367,7 +429,10 @@ public:
         for (auto it = doc_categories.first; it != doc_categories.second; ++ it) {
             auto & ad_cat_cnt = ad_cat_counts[make_pair(group_id, it->second.first)];
 
-            ad_cat_cnt.future += it->second.second * sign;
+            ad_cat_cnt.future_all += it->second.second * sign;
+
+            if (clicked >= 0)
+                ad_cat_cnt.future += it->second.second * sign;
 
             if (clicked > 0)
                 ad_cat_cnt.future_pos += it->second.second * sign;
@@ -379,7 +444,7 @@ class topic_writer {
     std::unordered_map<std::pair<int, int>, counts<float>> ad_top_counts;
 public:
     std::string get_header() {
-        return "top_past_views,top_past_clicks,top_future_views,top_future_clicks";
+        return "top_past_views,top_past_clicks,top_past_all_views,top_future_views,top_future_clicks,top_future_all_views";
     }
 
     void write(std::ostream & out, int group_id, int ad_id) {
@@ -390,23 +455,30 @@ public:
 
         float top_past_views = 0;
         float top_past_clicks = 0;
+        float top_past_all_views = 0;
+
         float top_future_views = 0;
         float top_future_clicks = 0;
+        float top_future_all_views = 0;
 
         for (auto it = doc_topics.first; it != doc_topics.second; ++ it) {
             auto & ad_top_cnt = ad_top_counts[make_pair(group_id, it->second.first)];
 
             top_past_views += ad_top_cnt.past * it->second.second;
             top_past_clicks += ad_top_cnt.past_pos * it->second.second;
+            top_past_all_views += ad_top_cnt.past_all * it->second.second;
 
             top_future_views += ad_top_cnt.future * it->second.second;
             top_future_clicks += ad_top_cnt.future_pos * it->second.second;
+            top_future_all_views += ad_top_cnt.future_all * it->second.second;
         }
 
         out << top_past_views << ","
             << top_past_clicks << ","
+            << top_past_all_views << ","
             << top_future_views << ","
-            << top_future_clicks << endl;
+            << top_future_clicks << ","
+            << top_future_all_views << endl;
     }
 
     void update_past(int group_id, int ad_id, int clicked) {
@@ -418,7 +490,10 @@ public:
         for (auto it = doc_topics.first; it != doc_topics.second; ++ it) {
             auto & ad_top_cnt = ad_top_counts[make_pair(group_id, it->second.first)];
 
-            ad_top_cnt.past += it->second.second;
+            ad_top_cnt.past_all += it->second.second;
+
+            if (clicked >= 0)
+                ad_top_cnt.past += it->second.second;
 
             if (clicked > 0)
                 ad_top_cnt.past_pos += it->second.second;
@@ -434,7 +509,10 @@ public:
         for (auto it = doc_topics.first; it != doc_topics.second; ++ it) {
             auto & ad_top_cnt = ad_top_counts[make_pair(group_id, it->second.first)];
 
-            ad_top_cnt.future += it->second.second * sign;
+            ad_top_cnt.future_all += it->second.second * sign;
+
+            if (clicked >= 0)
+                ad_top_cnt.future += it->second.second * sign;
 
             if (clicked > 0)
                 ad_top_cnt.future_pos += it->second.second * sign;
@@ -453,22 +531,20 @@ struct row {
 
 
 template <typename W>
-void process_group(W & w, const std::vector<row> & group, std::ostream & out, bool update) {
-    if (update)
-        for (auto it = group.begin(); it != group.end(); ++ it)
-            w.update_future(it->group_id, it->ad_id, it->clicked, -1);
+void process_group(W & w, const std::vector<row> & group, std::ostream & out) {
+    for (auto it = group.begin(); it != group.end(); ++ it)
+        w.update_future(it->group_id, it->ad_id, it->clicked, -1);
 
     for (auto it = group.begin(); it != group.end(); ++ it)
         w.write(out, it->group_id, it->ad_id);
 
-    if (update)
-        for (auto it = group.begin(); it != group.end(); ++ it)
-            w.update_past(it->group_id, it->ad_id, it->clicked);
+    for (auto it = group.begin(); it != group.end(); ++ it)
+        w.update_past(it->group_id, it->ad_id, it->clicked);
 }
 
 
 template <typename W>
-void fill_future(int group_extractor(const event & e), W & w, const std::string & in_file_name) {
+void fill_future(int group_extractor(const event & e), W & w, const std::string & in_file_name, bool known) {
     using namespace std;
 
     compressed_csv_file in(in_file_name);
@@ -485,7 +561,7 @@ void fill_future(int group_extractor(const event & e), W & w, const std::string 
         if (row.empty())
             break;
 
-        w.update_future(group_extractor(events[stoi(row[0])]), stoi(row[1]), stoi(row[2]), 1);
+        w.update_future(group_extractor(events[stoi(row[0])]), stoi(row[1]), known ? stoi(row[2]) : -1, 1);
 
         ++ i;
 
@@ -514,7 +590,8 @@ void generate(int group_extractor(const event & e), const std::string & features
 
     W w;
 
-    fill_future(group_extractor, w, a_in_file_name);
+    fill_future(group_extractor, w, a_in_file_name, true);
+    fill_future(group_extractor, w, b_in_file_name, false);
 
     cout << "Generating " << a_out_file_name<< " and " << b_out_file_name << "... ";
     cout.flush();
@@ -541,7 +618,6 @@ void generate(int group_extractor(const event & e), const std::string & features
 
     vector<row> group;
     int group_event_id = -1;
-    bool group_update = false;
     boost::iostreams::filtering_ostream * group_out = nullptr;
 
     while (!a_row.empty() || !b_row.empty()) {
@@ -554,12 +630,11 @@ void generate(int group_extractor(const event & e), const std::string & features
             r.clicked = stoi(a_row[2]);
 
             if (event_id != group_event_id) {
-                process_group(w, group, *group_out, group_update);
+                process_group(w, group, *group_out);
 
                 group.clear();
                 group_event_id = event_id;
                 group_out = &a_out;
-                group_update = true;
             }
 
             group.push_back(r);
@@ -574,12 +649,11 @@ void generate(int group_extractor(const event & e), const std::string & features
             r.clicked = -1;
 
             if (event_id != group_event_id) {
-                process_group(w, group, *group_out, group_update);
+                process_group(w, group, *group_out);
 
                 group.clear();
                 group_event_id = event_id;
                 group_out = &b_out;
-                group_update = false;
             }
 
             group.push_back(r);
@@ -595,7 +669,7 @@ void generate(int group_extractor(const event & e), const std::string & features
         }
     }
 
-    process_group(w, group, *group_out, group_update);
+    process_group(w, group, *group_out);
 
     clock_t end = clock();
     double elapsed = double(end - begin) / CLOCKS_PER_SEC;
@@ -645,12 +719,12 @@ int main() {
 
     // Generating
 
-    generate_all<group_writer<uint16_t>>(uid_extractor, "uid_viewed_grps");
+    /*generate_all<group_writer<uint16_t>>(uid_extractor, "uid_viewed_grps");
     generate_all<ad_writer<uint8_t>>(uid_extractor, "uid_viewed_ads");
     generate_all<source_writer<uint8_t>>(uid_extractor, "uid_viewed_ad_srcs");
     generate_all<campaign_writer<uint8_t>>(uid_extractor, "uid_viewed_ad_cmps");
     generate_all<category_writer>(uid_extractor, "uid_viewed_ad_cats");
-    generate_all<topic_writer>(uid_extractor, "uid_viewed_ad_tops");
+    generate_all<topic_writer>(uid_extractor, "uid_viewed_ad_tops");*/
 
     generate_all<ad_writer<uint32_t>>(g2_extractor, "g2_viewed_ads");
     generate_all<source_writer<uint32_t>>(g2_extractor, "g2_viewed_ad_srcs");

@@ -1,10 +1,9 @@
 #include "util/io.h"
 #include "util/data.h"
 #include "util/generation.h"
+#include "util/helpers.h"
 
 #include "ffm.h"
-
-#include <cmath>
 
 std::vector<std::pair<std::string, std::string>> files = {
     { "cache/clicks_val_train.csv.gz", "val_train" },
@@ -16,24 +15,8 @@ std::vector<std::pair<std::string, std::string>> files = {
 std::vector<std::string> features = {
     "leak",
     "viewed_docs", "viewed_categories", "viewed_topics",
-    "uid_viewed_ads", "uid_viewed_ad_srcs", "viewed_ad_categories", "viewed_ad_topics"
+    "uid_viewed_ads", "viewed_ad_srcs", "viewed_ad_categories", "viewed_ad_topics"
 };
-
-
-inline float pos_time_diff(int64_t td) {
-    if (td < 0)
-        return 0;
-
-    return log(1 + td) / 100;
-}
-
-inline float time_diff(int64_t td) {
-    if (td < 0)
-        return - log(1 - td) / 100;
-
-    return log(1 + td) / 100;
-}
-
 
 std::string cur_dataset;
 
@@ -186,10 +169,10 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     if (stoi(rows[5][1]) > 0)
         features.raw(12, 21); // Clicked this ad earlier
 
-    if (stoi(rows[5][2]) > 0)
+    if (stoi(rows[5][3]) > 0)
         features.raw(12, 22); // Viewed this ad doc earlier
 
-    if (stoi(rows[5][3]) > 0)
+    if (stoi(rows[5][4]) > 0)
         features.raw(12, 23); // Clicked this ad doc earlier
 
     if (stoi(rows[6][0]) > 0)

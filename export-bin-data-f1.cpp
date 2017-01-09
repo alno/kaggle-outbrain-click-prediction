@@ -1,10 +1,9 @@
 #include "util/io.h"
 #include "util/data.h"
 #include "util/generation.h"
+#include "util/helpers.h"
 
 #include "ffm.h"
-
-#include <cmath>
 
 std::vector<std::pair<std::string, std::string>> files = {
     { "cache/clicks_val_train.csv.gz", "val_train" },
@@ -16,24 +15,8 @@ std::vector<std::pair<std::string, std::string>> files = {
 std::vector<std::string> features = {
     "leak",
     "viewed_docs", "viewed_categories", "viewed_topics",
-    "uid_viewed_ads", "uid_viewed_ad_srcs", "viewed_ad_categories", "viewed_ad_topics"
+    "uid_viewed_ads", "uid_viewed_ad_cmps", "uid_viewed_ad_srcs", "uid_viewed_ad_cats", "viewed_ad_topics"
 };
-
-
-inline float pos_time_diff(int64_t td) {
-    if (td < 0)
-        return 0;
-
-    return log(1 + td) / 100;
-}
-
-inline float time_diff(int64_t td) {
-    if (td < 0)
-        return - log(1 - td) / 100;
-
-    return log(1 + td) / 100;
-}
-
 
 std::string cur_dataset;
 
@@ -180,49 +163,70 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
 
     // Ad view/click features
 
-    if (stoi(rows[5][0]) > 0)
+    auto & v_ad_row = rows[5];
+    auto & v_ad_cmp_row = rows[6];
+    auto & v_ad_src_row = rows[7];
+    auto & v_ad_cat_row = rows[8];
+    auto & v_ad_top_row = rows[9];
+
+    if (stoi(v_ad_row[2]) > 0)
         features.raw(12, 20); // Viewed this ad earlier
 
-    if (stoi(rows[5][1]) > 0)
+    if (stoi(v_ad_row[1]) > 0)
         features.raw(12, 21); // Clicked this ad earlier
 
-    if (stoi(rows[5][2]) > 0)
+    if (stoi(v_ad_row[5]) > 0)
         features.raw(12, 22); // Viewed this ad doc earlier
 
-    if (stoi(rows[5][3]) > 0)
+    if (stoi(v_ad_row[4]) > 0)
         features.raw(12, 23); // Clicked this ad doc earlier
 
-    if (stoi(rows[6][0]) > 0)
+
+//    if (stoi(v_ad_cmp_row[1]) > 0)
+//        features.raw(12, 33); // Clicked ad of the same campaign earlier
+
+
+    if (stoi(v_ad_src_row[2]) > 0)
         features.raw(12, 24); // Viewed ad of the same publisher earlier
 
-    if (stoi(rows[6][1]) > 0)
+    if (stoi(v_ad_src_row[1]) > 0)
         features.raw(12, 25); // Clicked ad of the same publisher earlier
 
-    if (stoi(rows[6][2]) > 0)
+    if (stoi(v_ad_src_row[5]) > 0)
         features.raw(12, 26); // Viewed ad of the same source earlier
 
-    if (stoi(rows[6][3]) > 0)
+    if (stoi(v_ad_src_row[4]) > 0)
         features.raw(12, 27); // Clicked ad of the same source earlier
 
-    if (stof(rows[7][0]) > 0)
+
+    if (stof(v_ad_cat_row[2]) > 0)
         features.raw(12, 28); // Viewed ad of the similar category
 
-    if (stof(rows[7][1]) > 0)
+    if (stof(v_ad_cat_row[1]) > 0)
         features.raw(12, 29); // Clicked ad of the similar category
 
-    if (stof(rows[8][0]) > 0)
+
+    if (stof(v_ad_top_row[0]) > 0)
         features.raw(12, 30); // Viewed ad of the similar topic
 
-    if (stof(rows[8][1]) > 0)
+    if (stof(v_ad_top_row[1]) > 0)
         features.raw(12, 32); // Clicked ad of the similar topic
 
     // Ad view features from future
 
-    if (stoi(rows[5][4]) > 0)
+    if (stoi(v_ad_row[8]) > 0)
         features.raw(13, 40); // Viewed this ad later
 
-    if (stoi(rows[5][6]) > 0)
+    if (stoi(v_ad_row[11]) > 0)
         features.raw(13, 41); // Viewed this ad doc later
+
+
+    if (stoi(v_ad_row[8]) == 0 && stoi(v_ad_cmp_row[8]) > 0)
+        features.raw(14, 42); // Not viewed this ad doc later however viewed this campaign
+
+    // CTR features
+
+    features.raw(17, 43, ctr_logit(stoi(v_ad_src_row[3]) + stoi(v_ad_src_row[9]), stoi(v_ad_src_row[4]) + stoi(v_ad_src_row[10]))); // CTR logit of past and future source clicks
 
     // Other features
 
