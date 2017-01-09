@@ -27,22 +27,22 @@ def fit_predict(profile, split, split_name):
 
 profiles = {
     'p1': {
-        'options': "--epochs 7 --seed 2017",
+        'options': "--epochs 5 --seed 2017",
         'dataset': "p1",
     },
 
     'p1r': {
-        'options': "--epochs 7 --restricted --seed 123",
+        'options': "--epochs 5 --restricted --seed 123",
         'dataset': "p1",
     },
 
     'f1': {
-        'options': "--epochs 7 --seed 42",
+        'options': "--epochs 5 --seed 42",
         'dataset': "f1",
     },
 
     'f1r': {
-        'options': "--epochs 7 --restricted --seed 456",
+        'options': "--epochs 5 --restricted --seed 456",
         'dataset': "f1",
     },
 }

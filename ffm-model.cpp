@@ -13,17 +13,17 @@
 #define _mm256_set_m128(v0, v1)  _mm256_insertf128_ps(_mm256_castps128_ps256(v1), (v0), 1)
 
 
-const ffm_uint align_bytes = 16;
-const ffm_uint align_floats = align_bytes / sizeof(ffm_float);
+constexpr ffm_uint align_bytes = 16;
+constexpr ffm_uint align_floats = align_bytes / sizeof(ffm_float);
 
-const ffm_ulong n_fields = 30;
-const ffm_ulong n_features = 1 << ffm_hash_bits;
+constexpr ffm_ulong n_fields = 30;
+constexpr ffm_ulong n_features = 1 << ffm_hash_bits;
 
-const ffm_ulong n_dim = 4;
-const ffm_ulong n_dim_aligned = ((n_dim - 1) / align_floats + 1) * align_floats;
+constexpr ffm_ulong n_dim = 6;
+constexpr ffm_ulong n_dim_aligned = ((n_dim - 1) / align_floats + 1) * align_floats;
 
-const ffm_ulong index_stride = n_fields * n_dim_aligned * 2;
-const ffm_ulong field_stride = n_dim_aligned * 2;
+constexpr ffm_ulong index_stride = n_fields * n_dim_aligned * 2;
+constexpr ffm_ulong field_stride = n_dim_aligned * 2;
 
 
 static ffm_float * malloc_aligned_float(ffm_ulong size) {
