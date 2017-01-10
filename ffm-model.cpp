@@ -19,7 +19,7 @@ constexpr ffm_uint align_floats = align_bytes / sizeof(ffm_float);
 constexpr ffm_ulong n_fields = 30;
 constexpr ffm_ulong n_features = 1 << ffm_hash_bits;
 
-constexpr ffm_ulong n_dim = 6;
+constexpr ffm_ulong n_dim = 14;
 constexpr ffm_ulong n_dim_aligned = ((n_dim - 1) / align_floats + 1) * align_floats;
 
 constexpr ffm_ulong index_stride = n_fields * n_dim_aligned * 2;

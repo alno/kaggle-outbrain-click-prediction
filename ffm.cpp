@@ -397,7 +397,7 @@ int main(int ac, char* av[]) {
 
     // Run model
     if (opts.model_name == "ffm") {
-        ffm_model model(opts.seed, opts.restricted);
+        ffm_model model(opts.seed + 100, opts.restricted);
         apply(model, opts);
     } else {
         throw std::runtime_error(std::string("Unknown model ") + opts.model_name);

@@ -16,6 +16,13 @@ from scipy.special import logit
 
 
 preds = [
+    '20170110-0230-ffm2-f1-0.69220',
+    '20170110-1055-ffm2-f1-2-0.69214',
+
+    '20170110-0124-ffm2-f1-0.69175',
+
+    '20170109-1354-ffm2-f1-0.69148',
+
     '20170108-2008-ffm2-f1-0.68984',
 
     '20170107-2248-ffm2-p1-0.68876',
@@ -33,10 +40,11 @@ preds = [
     '20161231-1927-vw-p2-0.66718',
 
     '20170106-1339-vw-p1-0.67829',
+    '20170109-1239-vw-p2-0.67148',
 ]
 
 models = {
-    'lr': lambda: SklearnModel(LogisticRegression(C=1.0)),
+    'lr': lambda: SklearnModel(LogisticRegression(C=0.01)),
     'nn': lambda: KerasModel(batch_size=128, layers=[40, 10], dropouts=[0.3, 0.1], n_epoch=1)
 }
 
