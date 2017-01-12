@@ -70,7 +70,7 @@ print "  Present score: %.5f" % present_score
 print "  Future score: %.5f" % future_score
 print "  Total score: %.5f" % score
 
-pred[['pred']].to_pickle('preds/%s-val.pickle' % name)
+pred[['pred']].to_csv('preds/%s-val.csv.gz' % name, index=False, compression='gzip')
 
 del pred
 
@@ -79,7 +79,7 @@ del pred
 print "Full split..."
 
 pred = fit_predict(profile, full_split, 'full')
-pred[['pred']].to_pickle('preds/%s-test.pickle' % name)
+pred[['pred']].to_csv('preds/%s-test.csv.gz' % name, index=False, compression='gzip')
 
 print "  Generating submission..."
 subm = gen_submission(pred)
