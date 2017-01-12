@@ -4,7 +4,7 @@ import pandas as pd
 import os
 import argparse
 
-from util.meta import full_split, val_split
+from util.meta import full_split, cv1_split, cv2_split
 from util import gen_prediction_name, gen_submission, score_prediction, print_and_exec
 
 
@@ -13,8 +13,9 @@ def fit_predict(profile, split, split_name):
     pred_file = 'cache/%s_test_bin_%s' % (split_name, profile['dataset'])
 
     opts = profile['options']
+    opts += " --epochs %d" % profile['epochs']
 
-    if split_name == "val":
+    if split_name != "full":
         opts += " --val %s" % pred_file
 
     print_and_exec("bin/ffm %s --train %s --test %s --pred  /tmp/ffm2.preds" % (opts, train_file, pred_file))
@@ -27,28 +28,39 @@ def fit_predict(profile, split, split_name):
 
 profiles = {
     'p1': {
-        'options': "--epochs 4 --seed 2017",
+        'epochs': 4,
+        'options': "--seed 2017",
         'dataset': "p1",
     },
 
     'p1r': {
-        'options': "--epochs 4 --restricted --seed 123",
+        'epochs': 4,
+        'options': "--restricted --seed 123",
         'dataset': "p1",
     },
 
     'f1': {
-        'options': "--epochs 4 --seed 42",
-        'dataset': "f1",
-    },
-
-    'f1-2': {
-        'options': "--epochs 4 --seed 2143",
+        'epochs': 4,
+        'options': "--seed 42",
         'dataset': "f1",
     },
 
     'f1r': {
-        'options': "--epochs 4 --restricted --seed 456",
+        'epochs': 4,
+        'options': "--restricted --seed 71",
         'dataset': "f1",
+    },
+
+    'f2': {
+        'epochs': 4,
+        'options': "--seed 456",
+        'dataset': "f2",
+    },
+
+    'f2r': {
+        'epochs': 4,
+        'options': "--restricted --seed 456",
+        'dataset': "f2",
     },
 }
 
@@ -61,27 +73,45 @@ args = parser.parse_args()
 profile = profiles[args.profile]
 
 
-if not os.path.exists('cache/val_train_bin_%s.index' % profile['dataset']) or args.rewrite_cache:
+if not os.path.exists('cache/full_train_bin_%s.index' % profile['dataset']) or args.rewrite_cache:
     print "Generating data..."
     os.system("bin/export-bin-data-%s" % profile['dataset'])
 
 
-## Validation
+## Validation on CV2
 
-print "Validation split..."
+print "CV2 split..."
 
-pred = fit_predict(profile, val_split, 'val')
+pred = fit_predict(profile, cv2_split, 'cv2')
 
 print "  Scoring..."
 
-present_score, future_score, score = score_prediction(pred)
-name = gen_prediction_name('ffm2-%s' % args.profile, score)
+cv2_present_score, cv2_future_score, cv2_score = score_prediction(pred)
+name = gen_prediction_name('ffm2-%s' % args.profile, cv2_score)
 
-print "  Present score: %.5f" % present_score
-print "  Future score: %.5f" % future_score
-print "  Total score: %.5f" % score
+print "  Present score: %.5f" % cv2_present_score
+print "  Future score: %.5f" % cv2_future_score
+print "  Total score: %.5f" % cv2_score
 
-pred[['pred']].to_pickle('preds/%s-val.pickle' % name)
+pred[['pred']].to_csv('preds/%s-cv2.csv.gz' % name, index=False, compression='gzip')
+
+del pred
+
+## Validation on CV1
+
+print "CV1 split..."
+
+pred = fit_predict(profile, cv1_split, 'cv1')
+
+print "  Scoring..."
+
+cv1_present_score, cv1_future_score, cv1_score = score_prediction(pred)
+
+print "  Present score: %.5f" % cv1_present_score
+print "  Future score: %.5f" % cv1_future_score
+print "  Total score: %.5f" % cv1_score
+
+pred[['pred']].to_csv('preds/%s-cv1.csv.gz' % name, index=False, compression='gzip')
 
 del pred
 
@@ -90,7 +120,7 @@ del pred
 print "Full split..."
 
 pred = fit_predict(profile, full_split, 'full')
-pred[['pred']].to_pickle('preds/%s-test.pickle' % name)
+pred[['pred']].to_csv('preds/%s-test.csv.gz' % name, index=False, compression='gzip')
 
 print "  Generating submission..."
 subm = gen_submission(pred)

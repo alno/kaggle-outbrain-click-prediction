@@ -3,7 +3,7 @@ import numpy as np
 
 import sys
 
-from util.meta import full_split, val_split, val_split_time, test_split_time
+from util.meta import full_split, cv1_split, cv1_split_time, test_split_time
 from util import gen_prediction_name, gen_submission, score_sorted
 from util.sklearn_model import SklearnModel
 from util.keras_model import KerasModel
@@ -59,7 +59,7 @@ def y_hash(y):
 def fit_present_model(events, train_X, train_y, train_event):
     print "Training present model..."
 
-    train_is_present = train_event.isin(events[events['timestamp'] < val_split_time].index).values
+    train_is_present = train_event.isin(events[events['timestamp'] < cv1_split_time].index).values
 
     present_train_X = train_X[train_is_present].values
     present_train_y = train_y[train_is_present].values
@@ -97,8 +97,8 @@ def fit_future_model(events, train_X, train_y, train_event):
 
     val2_split_time = 1078667779
 
-    train_is_future_all = train_event.isin(events[events['timestamp'] >= val_split_time].index.values)
-    train_is_future_train = train_event.isin(events[(events['timestamp'] >= val_split_time) & (events['timestamp'] < val2_split_time)].index.values)
+    train_is_future_all = train_event.isin(events[events['timestamp'] >= cv1_split_time].index.values)
+    train_is_future_train = train_event.isin(events[(events['timestamp'] >= cv1_split_time) & (events['timestamp'] < val2_split_time)].index.values)
     train_is_future_val = train_event.isin(events[(events['timestamp'] >= val2_split_time) & (events['timestamp'] < test_split_time)].index.values)
 
     future_train_X = train_X[train_is_future_train].values
@@ -126,8 +126,8 @@ def fit_future_model(events, train_X, train_y, train_event):
 
 def load_x(ds):
     if ds == 'train':
-        feature_ds = 'val_test'
-        pred_ds = 'val'
+        feature_ds = 'cv1_test'
+        pred_ds = 'cv1'
     elif ds == 'test':
         feature_ds = 'full_test'
         pred_ds = 'test'
@@ -138,7 +138,7 @@ def load_x(ds):
     X.append((pd.read_csv('cache/leak_%s.csv.gz' % feature_ds, dtype=np.uint8) > 0).astype(np.uint8))
 
     for pi, p in enumerate(preds):
-        X.append(logit(pd.read_pickle('preds/%s-%s.pickle' % (p, pred_ds))[['pred']].rename(columns={'pred': 'p%d' % pi}).clip(lower=1e-12, upper=1-1e-12)))
+        X.append(logit(pd.read_csv('preds/%s-%s.csv.gz' % (p, pred_ds), dtype=np.float32)[['pred']].rename(columns={'pred': 'p%d' % pi}).clip(lower=1e-7, upper=1-1e-7)))
 
     return pd.concat(X, axis=1)
 
@@ -146,7 +146,7 @@ def load_x(ds):
 def load_train_data():
     print "Loading train data..."
 
-    d = pd.read_csv(val_split[1], dtype=np.uint32, usecols=['display_id', 'clicked'])
+    d = pd.read_csv(cv1_split[1], dtype=np.uint32, usecols=['display_id', 'clicked'])
 
     return load_x('train'), d['clicked'], d['display_id']
 

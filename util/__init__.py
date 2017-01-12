@@ -6,7 +6,7 @@ import os
 
 from numba import jit
 
-from .meta import val_split_time
+from .meta import cv1_split_time
 
 
 def gen_prediction_name(model_name, score):
@@ -47,7 +47,7 @@ def score_prediction(pred):
         if cur_idx == t.display_id:
             cur_rank += 1
         else:
-            if t.timestamp >= val_split_time:
+            if t.timestamp >= cv1_split_time:
                 future_score_cnt += 1
             else:
                 present_score_cnt += 1
@@ -56,7 +56,7 @@ def score_prediction(pred):
             cur_rank = 1
 
         if t.clicked == 1:
-            if t.timestamp >= val_split_time:
+            if t.timestamp >= cv1_split_time:
                 future_score_sum += 1.0 / cur_rank
             else:
                 present_score_sum += 1.0 / cur_rank
