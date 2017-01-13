@@ -17,7 +17,8 @@ std::vector<std::pair<std::string, std::string>> files = {
 std::vector<std::string> features = {
     "leak",
     "viewed_docs", "viewed_categories", "viewed_topics",
-    "uid_viewed_ads", "uid_viewed_ad_cmps", "uid_viewed_ad_srcs", "uid_viewed_ad_cats", "uid_viewed_ad_tops"
+    "uid_viewed_ads", "uid_viewed_ad_cmps", "uid_viewed_ad_srcs", "uid_viewed_ad_cats", "uid_viewed_ad_tops",
+    "rivals"
 };
 
 std::string cur_dataset;
@@ -249,11 +250,21 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
 
     // Other features
 
-    features.raw(15, event.weekday + 50);
-    features.raw(15, event.hour + 70);
+    features.raw(15, event.weekday + 70);
+    features.raw(15, event.hour + 50);
 
     features.raw(16, 80, pos_time_diff(event.timestamp - ad_doc.publish_timestamp));
     features.raw(16, 81, time_diff(ev_doc.publish_timestamp - ad_doc.publish_timestamp));
+
+    features.raw(18, stoi(rows[10][0]) + 180); // Rival count
+
+    auto vd_oha_it = data.viewed_docs_one_hour_after.find(std::make_pair(event.uid, event.timestamp));
+    if (vd_oha_it != data.viewed_docs_one_hour_after.end()) {
+        auto doc_ids = vd_oha_it->second;
+
+        for (uint i = 0; i < doc_ids.size(); ++ i)
+            features.hashed(19, doc_ids[i]);
+    }
 
     // Similarity features
     /*
