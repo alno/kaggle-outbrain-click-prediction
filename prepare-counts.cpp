@@ -2,14 +2,28 @@
 #include "util/data.h"
 
 std::vector<std::pair<std::string, std::vector<std::string>>> filesets {
-    { "cv1", { "cache/clicks_cv1_train.csv.gz","cache/clicks_cv1_test.csv.gz" } },
-    { "cv2", { "cache/clicks_cv2_train.csv.gz","cache/clicks_cv2_test.csv.gz" } },
-    { "full", { "../input/clicks_train.csv.gz","../input/clicks_test.csv.gz" } }
+    { "cv1", { "cache/clicks_cv1_train.csv.gz", "cache/clicks_cv1_test.csv.gz" } },
+    { "cv2", { "cache/clicks_cv2_train.csv.gz", "cache/clicks_cv2_test.csv.gz" } },
+    { "full", { "../input/clicks_train.csv.gz", "../input/clicks_test.csv.gz" } }
+};
+
+
+struct cnt {
+    uint32_t train_count;
+    uint32_t test_count;
+
+    uint32_t & operator[](uint i) {
+        switch (i) {
+            case 0: return train_count;
+            case 1: return test_count;
+            default: throw std::logic_error("Invalid field index");
+        }
+    }
 };
 
 
 template <typename T>
-void write_counts(const std::unordered_map<T, uint32_t> & map, const std::string & file_name) {
+void write_counts(const std::unordered_map<T, cnt> & map, const std::string & file_name) {
     using namespace std;
 
     cout << "Writing " << file_name << "... " << endl;
@@ -23,10 +37,10 @@ void write_counts(const std::unordered_map<T, uint32_t> & map, const std::string
 
     std::ostream out(&buf);
 
-    out << "id,count" << endl;
+    out << "id,train_count,test_count" << endl;
 
     for (auto it = map.begin(); it != map.end(); ++ it)
-        out << it->first << "," << it->second << endl;
+        out << it->first << "," << it->second.train_count << "," << it->second.test_count << endl;
 }
 
 
@@ -37,40 +51,41 @@ int main() {
     auto data = load_reference_data();
 
     for (auto it = filesets.begin(); it != filesets.end(); ++ it) {
-        unordered_map<int, uint32_t> ad_counts;
-        unordered_map<int, uint32_t> ad_campaign_counts;
-        unordered_map<int, uint32_t> ad_advertiser_counts;
-        unordered_map<int, uint32_t> ad_doc_counts;
-        unordered_map<int, uint32_t> ad_doc_source_counts;
-        unordered_map<int, uint32_t> ad_doc_publisher_counts;
-        unordered_map<int, uint32_t> ev_doc_counts;
-        unordered_map<int, uint32_t> ev_doc_source_counts;
-        unordered_map<int, uint32_t> ev_doc_publisher_counts;
-        unordered_map<int, uint32_t> uid_counts;
+        unordered_map<int, cnt> ad_counts;
+        unordered_map<int, cnt> ad_campaign_counts;
+        unordered_map<int, cnt> ad_advertiser_counts;
+        unordered_map<int, cnt> ad_doc_counts;
+        unordered_map<int, cnt> ad_doc_source_counts;
+        unordered_map<int, cnt> ad_doc_publisher_counts;
+        unordered_map<int, cnt> ev_doc_counts;
+        unordered_map<int, cnt> ev_doc_source_counts;
+        unordered_map<int, cnt> ev_doc_publisher_counts;
+        unordered_map<int, cnt> uid_counts;
 
-        unordered_map<std::string, uint32_t> ev_country_counts;
-        unordered_map<std::string, uint32_t> ev_state_counts;
-        unordered_map<std::string, uint32_t> ev_region_counts;
+        unordered_map<std::string, cnt> ev_country_counts;
+        unordered_map<std::string, cnt> ev_state_counts;
+        unordered_map<std::string, cnt> ev_region_counts;
 
 
         cout << "Processing " << it->first << "... " << endl;
 
-        for (auto fi = it->second.begin(); fi != it->second.end(); ++ fi) {
+        for (uint fi = 0; fi < it->second.size(); ++ fi) {
+            auto file_name = it->second[fi];
             clock_t begin = clock();
 
-            cout << "  Loading " << *fi << "... ";
+            cout << "  Loading " << file_name << "... ";
             cout.flush();
 
-            compressed_csv_file file(*fi);
+            compressed_csv_file file(file_name);
 
-            for (int i = 0;; ++i) {
+            for (int ri = 0;; ++ri) {
                 auto row = file.getrow();
 
                 if (row.empty())
                     break;
 
-                if (i > 0 && i % 5000000 == 0) {
-                    cout << (i / 1000000) << "M... ";
+                if (ri > 0 && ri % 5000000 == 0) {
+                    cout << (ri / 1000000) << "M... ";
                     cout.flush();
                 }
 
@@ -85,23 +100,23 @@ int main() {
                 auto ev_doc = data.documents.at(ev.document_id);
 
                 // Increment counters
-                ++ ad_counts[ad_id];
-                ++ ad_campaign_counts[ad.campaign_id];
-                ++ ad_advertiser_counts[ad.advertiser_id];
+                ++ ad_counts[ad_id][fi];
+                ++ ad_campaign_counts[ad.campaign_id][fi];
+                ++ ad_advertiser_counts[ad.advertiser_id][fi];
 
-                ++ ad_doc_counts[ad.document_id];
-                ++ ad_doc_source_counts[ad_doc.source_id];
-                ++ ad_doc_publisher_counts[ad_doc.publisher_id];
+                ++ ad_doc_counts[ad.document_id][fi];
+                ++ ad_doc_source_counts[ad_doc.source_id][fi];
+                ++ ad_doc_publisher_counts[ad_doc.publisher_id][fi];
 
-                ++ ev_doc_counts[ev.document_id];
-                ++ ev_doc_source_counts[ev_doc.source_id];
-                ++ ev_doc_publisher_counts[ev_doc.publisher_id];
+                ++ ev_doc_counts[ev.document_id][fi];
+                ++ ev_doc_source_counts[ev_doc.source_id][fi];
+                ++ ev_doc_publisher_counts[ev_doc.publisher_id][fi];
 
-                ++ ev_country_counts[ev.country];
-                ++ ev_state_counts[ev.state];
-                ++ ev_region_counts[ev.region];
+                ++ ev_country_counts[ev.country][fi];
+                ++ ev_state_counts[ev.state][fi];
+                ++ ev_region_counts[ev.region][fi];
 
-                ++ uid_counts[ev.uid];
+                ++ uid_counts[ev.uid][fi];
             }
 
             clock_t end = clock();
@@ -110,23 +125,23 @@ int main() {
             cout << "done in " << elapsed << " seconds" << endl;
         }
 
-        write_counts(ad_counts, string("cache/ad_counts_") + it->first + string(".csv.gz"));
-        write_counts(ad_campaign_counts, string("cache/ad_campaign_counts_") + it->first + string(".csv.gz"));
-        write_counts(ad_advertiser_counts, string("cache/ad_advertiser_counts_") + it->first + string(".csv.gz"));
+        write_counts(ad_counts, string("cache/counts/ads_") + it->first + string(".csv.gz"));
+        write_counts(ad_campaign_counts, string("cache/counts/ad_campaigns_") + it->first + string(".csv.gz"));
+        write_counts(ad_advertiser_counts, string("cache/counts/ad_advertisers_") + it->first + string(".csv.gz"));
 
-        write_counts(ad_doc_counts, string("cache/ad_doc_counts_") + it->first + string(".csv.gz"));
-        write_counts(ad_doc_source_counts, string("cache/ad_doc_source_counts_") + it->first + string(".csv.gz"));
-        write_counts(ad_doc_publisher_counts, string("cache/ad_doc_publisher_counts_") + it->first + string(".csv.gz"));
+        write_counts(ad_doc_counts, string("cache/counts/ad_docs_") + it->first + string(".csv.gz"));
+        write_counts(ad_doc_source_counts, string("cache/counts/ad_doc_sources_") + it->first + string(".csv.gz"));
+        write_counts(ad_doc_publisher_counts, string("cache/counts/ad_doc_publishers_") + it->first + string(".csv.gz"));
 
-        write_counts(ev_doc_counts, string("cache/ev_doc_counts_") + it->first + string(".csv.gz"));
-        write_counts(ev_doc_source_counts, string("cache/ev_doc_source_counts_") + it->first + string(".csv.gz"));
-        write_counts(ev_doc_publisher_counts, string("cache/ev_doc_publisher_counts_") + it->first + string(".csv.gz"));
+        write_counts(ev_doc_counts, string("cache/counts/ev_docs_") + it->first + string(".csv.gz"));
+        write_counts(ev_doc_source_counts, string("cache/counts/ev_doc_sources_") + it->first + string(".csv.gz"));
+        write_counts(ev_doc_publisher_counts, string("cache/counts/ev_doc_publishers_") + it->first + string(".csv.gz"));
 
-        write_counts(ev_country_counts, string("cache/ev_country_counts_") + it->first + string(".csv.gz"));
-        write_counts(ev_state_counts, string("cache/ev_state_counts_") + it->first + string(".csv.gz"));
-        write_counts(ev_region_counts, string("cache/ev_region_counts_") + it->first + string(".csv.gz"));
+        write_counts(ev_country_counts, string("cache/counts/ev_countries_") + it->first + string(".csv.gz"));
+        write_counts(ev_state_counts, string("cache/counts/ev_states_") + it->first + string(".csv.gz"));
+        write_counts(ev_region_counts, string("cache/counts/ev_regions_") + it->first + string(".csv.gz"));
 
-        write_counts(uid_counts, string("cache/uid_counts_") + it->first + string(".csv.gz"));
+        write_counts(uid_counts, string("cache/counts/uids_") + it->first + string(".csv.gz"));
     }
 
     cout << "Done." << endl;

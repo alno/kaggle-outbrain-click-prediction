@@ -45,6 +45,11 @@ profiles = {
         'dataset': "f1",
     },
 
+    'f1-2': {
+        'options': "--epochs 5 --seed 2143",
+        'dataset': "f1",
+    },
+
     'f1r': {
         'epochs': 4,
         'options': "--restricted --seed 71",

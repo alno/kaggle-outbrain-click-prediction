@@ -26,3 +26,9 @@ constexpr float base_ctr_logit = logit(base_ctr);
 constexpr float ctr_logit(float views, float clicks, float reg = 50) {
     return logit((clicks + base_ctr * reg) / (views + reg)) - base_ctr_logit;
 }
+
+
+template <typename T>
+inline T min(T a, T b) {
+    return a < b ? a : b;
+}

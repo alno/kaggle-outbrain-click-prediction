@@ -22,16 +22,33 @@ std::vector<std::string> features = {
 
 std::string cur_dataset;
 
-std::unordered_map<int, int> ad_counts;
-std::unordered_map<int, int> ad_campaign_counts;
-std::unordered_map<int, int> ad_advertiser_counts;
-std::unordered_map<int, int> ad_doc_counts;
-std::unordered_map<int, int> ad_doc_source_counts;
-std::unordered_map<int, int> ad_doc_publisher_counts;
-std::unordered_map<int, int> ev_doc_counts;
-std::unordered_map<int, int> ev_doc_source_counts;
-std::unordered_map<int, int> ev_doc_publisher_counts;
-std::unordered_map<int, int> uid_counts;
+struct cnt {
+    uint32_t min_count;
+    uint32_t sum_count;
+};
+
+std::pair<int, cnt> read_cnt(const std::vector<std::string> & row) {
+    int id = stoi(row[0]);
+    uint32_t train_count = stoi(row[1]);
+    uint32_t test_count = stoi(row[2]);
+
+    cnt c;
+    c.min_count = min(train_count, test_count);
+    c.sum_count = train_count + test_count;
+
+    return std::make_pair(id, c);
+}
+
+std::unordered_map<int, cnt> ad_counts;
+std::unordered_map<int, cnt> ad_campaign_counts;
+std::unordered_map<int, cnt> ad_advertiser_counts;
+std::unordered_map<int, cnt> ad_doc_counts;
+std::unordered_map<int, cnt> ad_doc_source_counts;
+std::unordered_map<int, cnt> ad_doc_publisher_counts;
+std::unordered_map<int, cnt> ev_doc_counts;
+std::unordered_map<int, cnt> ev_doc_source_counts;
+std::unordered_map<int, cnt> ev_doc_publisher_counts;
+std::unordered_map<int, cnt> uid_counts;
 
 
 void load_dataset_data(const std::string & dataset) {
@@ -41,18 +58,18 @@ void load_dataset_data(const std::string & dataset) {
     cur_dataset = dataset;
     std::cout << "Loading " << dataset << " data..." << std::endl;
 
-    ad_counts = read_map(std::string("cache/ad_counts_") + dataset + std::string(".csv.gz"), read_count);
-    ad_campaign_counts = read_map(std::string("cache/ad_campaign_counts_") + dataset + std::string(".csv.gz"), read_count);
-    ad_advertiser_counts = read_map(std::string("cache/ad_advertiser_counts_") + dataset + std::string(".csv.gz"), read_count);
+    ad_counts = read_map(std::string("cache/counts/ads_") + dataset + std::string(".csv.gz"), read_cnt);
+    ad_campaign_counts = read_map(std::string("cache/counts/ad_campaigns_") + dataset + std::string(".csv.gz"), read_cnt);
+    ad_advertiser_counts = read_map(std::string("cache/counts/ad_advertisers_") + dataset + std::string(".csv.gz"), read_cnt);
 
-    ad_doc_counts = read_map(std::string("cache/ad_doc_counts_") + dataset + std::string(".csv.gz"), read_count);
-    ad_doc_source_counts = read_map(std::string("cache/ad_doc_source_counts_") + dataset + std::string(".csv.gz"), read_count);
-    ad_doc_publisher_counts = read_map(std::string("cache/ad_doc_publisher_counts_") + dataset + std::string(".csv.gz"), read_count);
+    ad_doc_counts = read_map(std::string("cache/counts/ad_docs_") + dataset + std::string(".csv.gz"), read_cnt);
+    ad_doc_source_counts = read_map(std::string("cache/counts/ad_doc_sources_") + dataset + std::string(".csv.gz"), read_cnt);
+    ad_doc_publisher_counts = read_map(std::string("cache/counts/ad_doc_publishers_") + dataset + std::string(".csv.gz"), read_cnt);
 
-    ev_doc_counts = read_map(std::string("cache/ev_doc_counts_") + dataset + std::string(".csv.gz"), read_count);
-    ev_doc_source_counts = read_map(std::string("cache/ev_doc_source_counts_") + dataset + std::string(".csv.gz"), read_count);
-    ev_doc_publisher_counts = read_map(std::string("cache/ev_doc_publisher_counts_") + dataset + std::string(".csv.gz"), read_count);
-    uid_counts = read_map(std::string("cache/uid_counts_") + dataset + std::string(".csv.gz"), read_count);
+    ev_doc_counts = read_map(std::string("cache/counts/ev_docs_") + dataset + std::string(".csv.gz"), read_cnt);
+    ev_doc_source_counts = read_map(std::string("cache/counts/ev_doc_sources_") + dataset + std::string(".csv.gz"), read_cnt);
+    ev_doc_publisher_counts = read_map(std::string("cache/counts/ev_doc_publishers_") + dataset + std::string(".csv.gz"), read_cnt);
+    uid_counts = read_map(std::string("cache/counts/uids_") + dataset + std::string(".csv.gz"), read_cnt);
 }
 
 
@@ -116,12 +133,12 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     features.hashed(1, event.country);
     features.hashed(2, event.state);
     //features.hashed(, event.region);
-    features.hashed(3, uid_count < 50 ? uid_count : event.uid + 100);
+    features.hashed(3, uid_count.min_count < 50 ? uid_count.sum_count : event.uid + 100);
 
     // Document info
-    features.hashed(4, ev_doc_count < 50 ? ev_doc_count : event.document_id + 100);
-    features.hashed(5, ev_doc_source_count < 10 ? ev_doc_source_count : ev_doc.source_id + 10);
-    features.hashed(6, ev_doc_publisher_count < 10 ? ev_doc_publisher_count : ev_doc.publisher_id + 10);
+    features.hashed(4, ev_doc_count.min_count < 5 ? ev_doc_count.sum_count : event.document_id + 100);
+    features.hashed(5, ev_doc_source_count.min_count < 5 ? ev_doc_source_count.sum_count : ev_doc.source_id + 10);
+    features.hashed(6, ev_doc_publisher_count.min_count < 5 ? ev_doc_publisher_count.sum_count : ev_doc.publisher_id + 10);
 
     for (auto it = ev_doc_categories.first; it != ev_doc_categories.second; ++ it)
         features.hashed(7, it->second.first, it->second.second);
@@ -246,14 +263,14 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     */
 
     // Ad features
-    features.hashed(20, ad_count < 50 ? ad_count : ad_id + 100);
-    features.hashed(21, ad_campaign_count < 50 ? ad_campaign_count : ad.campaign_id + 100);
-    features.hashed(22, ad_advertiser_count < 50 ? ad_advertiser_count : ad.advertiser_id + 100);
+    features.hashed(20, ad_count.min_count < 5 ? ad_count.sum_count : ad_id + 100);
+    features.hashed(21, ad_campaign_count.min_count < 5 ? ad_campaign_count.sum_count : ad.campaign_id + 100);
+    features.hashed(22, ad_advertiser_count.min_count < 5 ? ad_advertiser_count.sum_count : ad.advertiser_id + 100);
 
     // Promoted document info
-    features.hashed(23, ad_doc_count < 50 ? ad_doc_count : ad.document_id + 100);
-    features.hashed(24, ad_doc_source_count < 10 ? ad_doc_source_count : ad_doc.source_id + 10);
-    features.hashed(25, ad_doc_publisher_count < 10 ? ad_doc_publisher_count : ad_doc.publisher_id + 10);
+    features.hashed(23, ad_doc_count.min_count < 5 ? ad_doc_count.sum_count : ad.document_id + 100);
+    features.hashed(24, ad_doc_source_count.min_count < 5 ? ad_doc_source_count.sum_count : ad_doc.source_id + 10);
+    features.hashed(25, ad_doc_publisher_count.min_count < 5 ? ad_doc_publisher_count.sum_count : ad_doc.publisher_id + 10);
 
     for (auto it = ad_doc_categories.first; it != ad_doc_categories.second; ++ it)
         features.hashed(26, it->second.first, it->second.second);
