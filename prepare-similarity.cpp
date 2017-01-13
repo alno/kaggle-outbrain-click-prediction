@@ -1,10 +1,12 @@
 #include "util/io.h"
 
 std::vector<std::pair<std::string, std::string>> filesets {
+    std::make_pair("cache/clicks_cv1_train.csv.gz", "cache/similarity_cv1_train.csv.gz"),
+    std::make_pair("cache/clicks_cv1_test.csv.gz", "cache/similarity_cv1_test.csv.gz"),
+    std::make_pair("cache/clicks_cv2_train.csv.gz", "cache/similarity_cv2_train.csv.gz"),
+    std::make_pair("cache/clicks_cv2_test.csv.gz", "cache/similarity_cv2_test.csv.gz"),
     std::make_pair("../input/clicks_train.csv.gz", "cache/similarity_full_train.csv.gz"),
     std::make_pair("../input/clicks_test.csv.gz", "cache/similarity_full_test.csv.gz"),
-    std::make_pair("cache/clicks_val_train.csv.gz", "cache/similarity_val_train.csv.gz"),
-    std::make_pair("cache/clicks_val_test.csv.gz", "cache/similarity_val_test.csv.gz"),
 };
 
 struct event_info {

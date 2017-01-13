@@ -6,8 +6,10 @@
 #include "ffm.h"
 
 std::vector<std::pair<std::string, std::string>> files = {
-    { "cache/clicks_val_train.csv.gz", "val_train" },
-    { "cache/clicks_val_test.csv.gz", "val_test" },
+    { "cache/clicks_cv2_train.csv.gz", "cv2_train" },
+    { "cache/clicks_cv2_test.csv.gz", "cv2_test" },
+    { "cache/clicks_cv1_train.csv.gz", "cv1_train" },
+    { "cache/clicks_cv1_test.csv.gz", "cv1_test" },
     { "../input/clicks_train.csv.gz", "full_train" },
     { "../input/clicks_test.csv.gz", "full_test" },
 };
@@ -15,7 +17,7 @@ std::vector<std::pair<std::string, std::string>> files = {
 std::vector<std::string> features = {
     "leak",
     "viewed_docs", "viewed_categories", "viewed_topics",
-    "uid_viewed_ads", "uid_viewed_ad_cmps", "uid_viewed_ad_srcs", "uid_viewed_ad_cats", "viewed_ad_topics"
+    "uid_viewed_ads", "uid_viewed_ad_cmps", "uid_viewed_ad_srcs", "uid_viewed_ad_cats", "uid_viewed_ad_tops"
 };
 
 std::string cur_dataset;
@@ -206,7 +208,7 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
         features.raw(12, 29); // Clicked ad of the similar category
 
 
-    if (stof(v_ad_top_row[0]) > 0)
+    if (stof(v_ad_top_row[2]) > 0)
         features.raw(12, 30); // Viewed ad of the similar topic
 
     if (stof(v_ad_top_row[1]) > 0)

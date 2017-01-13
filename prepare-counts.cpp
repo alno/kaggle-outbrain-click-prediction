@@ -2,7 +2,8 @@
 #include "util/data.h"
 
 std::vector<std::pair<std::string, std::vector<std::string>>> filesets {
-    { "val", { "cache/clicks_val_train.csv.gz","cache/clicks_val_test.csv.gz" } },
+    { "cv1", { "cache/clicks_cv1_train.csv.gz","cache/clicks_cv1_test.csv.gz" } },
+    { "cv2", { "cache/clicks_cv2_train.csv.gz","cache/clicks_cv2_test.csv.gz" } },
     { "full", { "../input/clicks_train.csv.gz","../input/clicks_test.csv.gz" } }
 };
 

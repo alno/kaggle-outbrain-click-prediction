@@ -3,10 +3,12 @@
 
 
 std::vector<std::pair<std::string, std::string>> filesets {
-    std::make_pair("cache/clicks_val_train.csv.gz", "val_train"),
-    std::make_pair("cache/clicks_val_test.csv.gz", "val_test"),
-    std::make_pair("../input/clicks_train.csv.gz", "full_train"),
-    std::make_pair("../input/clicks_test.csv.gz", "full_test"),
+    { "cache/clicks_cv1_train.csv.gz", "cv1_train" },
+    { "cache/clicks_cv1_test.csv.gz", "cv1_test" },
+    { "cache/clicks_cv2_train.csv.gz", "cv2_train" },
+    { "cache/clicks_cv2_test.csv.gz", "cv2_test" },
+    { "../input/clicks_train.csv.gz", "full_train" },
+    { "../input/clicks_test.csv.gz", "full_test" },
 };
 
 
@@ -719,12 +721,12 @@ int main() {
 
     // Generating
 
-    /*generate_all<group_writer<uint16_t>>(uid_extractor, "uid_viewed_grps");
+    generate_all<group_writer<uint16_t>>(uid_extractor, "uid_viewed_grps");
     generate_all<ad_writer<uint8_t>>(uid_extractor, "uid_viewed_ads");
     generate_all<source_writer<uint8_t>>(uid_extractor, "uid_viewed_ad_srcs");
     generate_all<campaign_writer<uint8_t>>(uid_extractor, "uid_viewed_ad_cmps");
     generate_all<category_writer>(uid_extractor, "uid_viewed_ad_cats");
-    generate_all<topic_writer>(uid_extractor, "uid_viewed_ad_tops");*/
+    generate_all<topic_writer>(uid_extractor, "uid_viewed_ad_tops");
 
     generate_all<ad_writer<uint32_t>>(g2_extractor, "g2_viewed_ads");
     generate_all<source_writer<uint32_t>>(g2_extractor, "g2_viewed_ad_srcs");
