@@ -16,7 +16,7 @@ void generate_files(const D & data, const std::vector<std::pair<std::vector<std:
         cout << "  Generating " << out_file_name << "... ";
         cout.flush();
 
-        clock_t begin = clock();
+        time_t begin = time(nullptr);
 
         vector<unique_ptr<compressed_csv_file>> in_files;
 
@@ -42,10 +42,7 @@ void generate_files(const D & data, const std::vector<std::pair<std::vector<std:
 
         writer.finish();
 
-        clock_t end = clock();
-        double elapsed = double(end - begin) / CLOCKS_PER_SEC;
-
-        cout << "done in " << elapsed << " seconds" << endl;
+        cout << "done in " << (time(nullptr) - begin) << " seconds" << endl;
     };
 }
 

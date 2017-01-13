@@ -68,7 +68,7 @@ template <typename K, typename T>
 std::unordered_map<K, T> read_map(const std::string & file_name, std::pair<K, T> read_entry(const std::vector<std::string> &)) {
     using namespace std;
 
-    clock_t begin = clock();
+    time_t begin = time(nullptr);
 
     cout << "  Loading " << boost::typeindex::type_id<T>().pretty_name() << "s from " << file_name << "... ";
     cout.flush();
@@ -90,10 +90,7 @@ std::unordered_map<K, T> read_map(const std::string & file_name, std::pair<K, T>
         }
     }
 
-    clock_t end = clock();
-    double elapsed = double(end - begin) / CLOCKS_PER_SEC;
-
-    cout << "done in " << elapsed << " seconds, " << res.size() << " records." << endl;
+    cout << "done in " << (time(nullptr) - begin) << " seconds, " << res.size() << " records." << endl;
 
     return res;
 }
@@ -103,7 +100,7 @@ template <typename K, typename T>
 void read_vector(std::vector<T> & res, const std::string & file_name, std::pair<K, T> read_entry(const std::vector<std::string> &), size_t size) {
     using namespace std;
 
-    clock_t begin = clock();
+    time_t begin = time(nullptr);
 
     cout << "  Loading " << boost::typeindex::type_id<T>().pretty_name() << "s from " << file_name << "... ";
     cout.flush();
@@ -129,10 +126,7 @@ void read_vector(std::vector<T> & res, const std::string & file_name, std::pair<
         }
     }
 
-    clock_t end = clock();
-    double elapsed = double(end - begin) / CLOCKS_PER_SEC;
-
-    cout << "done in " << elapsed << " seconds." << endl;
+    cout << "done in " << (time(nullptr) - begin) << " seconds." << endl;
 }
 
 
@@ -148,7 +142,7 @@ template <typename K, typename T>
 std::unordered_multimap<K, T> read_multi_map(const std::string & file_name, std::pair<K, T> read_entry(const std::vector<std::string> &)) {
     using namespace std;
 
-    clock_t begin = clock();
+    time_t begin = time(nullptr);
 
     cout << "  Loading " << boost::typeindex::type_id<T>().pretty_name() << "s from " << file_name << "... ";
     cout.flush();
@@ -170,10 +164,7 @@ std::unordered_multimap<K, T> read_multi_map(const std::string & file_name, std:
         }
     }
 
-    clock_t end = clock();
-    double elapsed = double(end - begin) / CLOCKS_PER_SEC;
-
-    cout << "done in " << elapsed << " seconds, " << res.size() << " records." << endl;
+    cout << "done in " << (time(nullptr) - begin) << " seconds, " << res.size() << " records." << endl;
 
     return res;
 }
@@ -183,7 +174,7 @@ template <typename K, typename T>
 void read_sorted_vector_map(std::unordered_map<K, std::vector<T>> & res, const std::string & file_name, std::pair<K, T> read_entry(const std::vector<std::string> &)) {
     using namespace std;
 
-    clock_t begin = clock();
+    time_t begin = time(nullptr);
 
     cout << "  Loading " << boost::typeindex::type_id<T>().pretty_name() << "s from " << file_name << "... ";
     cout.flush();
@@ -212,10 +203,7 @@ void read_sorted_vector_map(std::unordered_map<K, std::vector<T>> & res, const s
     for (auto it = res.begin(); it != res.end(); ++ it)
         std::sort(it->second.begin(), it->second.end());
 
-    clock_t end = clock();
-    double elapsed = double(end - begin) / CLOCKS_PER_SEC;
-
-    cout << "done in " << elapsed << " seconds, " << res.size() << " records." << endl;
+    cout << "done in " << (time(nullptr) - begin) << " seconds, " << res.size() << " records." << endl;
 }
 
 template <typename K, typename T>
