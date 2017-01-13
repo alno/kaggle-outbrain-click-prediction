@@ -13,7 +13,7 @@
 #define _mm256_set_m128(v0, v1)  _mm256_insertf128_ps(_mm256_castps128_ps256(v1), (v0), 1)
 
 
-constexpr ffm_uint align_bytes = 16;
+constexpr ffm_uint align_bytes = 32;
 constexpr ffm_uint align_floats = align_bytes / sizeof(ffm_float);
 
 constexpr ffm_ulong n_fields = 30;
@@ -24,6 +24,32 @@ constexpr ffm_ulong n_dim_aligned = ((n_dim - 1) / align_floats + 1) * align_flo
 
 constexpr ffm_ulong index_stride = n_fields * n_dim_aligned * 2;
 constexpr ffm_ulong field_stride = n_dim_aligned * 2;
+
+constexpr uint prefetch_depth = 1;
+
+
+inline uint test_mask_bit(uint64_t * mask, uint i) {
+    return (mask[i >> 6] >> (i & 63)) & 1;
+}
+
+
+inline void prefetch_interaction_weights(float * addr) {
+    for (uint i = 0, sz = field_stride * sizeof(float); i < sz; i += 64)
+        _mm_prefetch(((char *)addr) + i, _MM_HINT_T1);
+}
+
+
+inline ffm_float sum(__m256 val) {
+    __m128 s = _mm256_extractf128_ps(_mm256_add_ps(val,  _mm256_permute2f128_ps(val, val, 1)), 0);
+
+    s = _mm_hadd_ps(s, s);
+    s = _mm_hadd_ps(s, s);
+
+    float sum;
+    _mm_store_ss(&sum, s);
+
+    return sum;
+}
 
 
 static ffm_float * malloc_aligned_float(ffm_ulong size) {
@@ -97,7 +123,7 @@ ffm_float ffm_model::predict(const ffm_feature * start, const ffm_feature * end,
     ffm_float linear_total = 0;
     ffm_float linear_norm = end - start;
 
-    __m128 xmm_total = _mm_set1_ps(bias_w);
+    __m256 xmm_total = _mm256_set1_ps(bias_w);
 
     ffm_uint i = 0;
 
@@ -119,7 +145,15 @@ ffm_float ffm_model::predict(const ffm_feature * start, const ffm_feature * end,
             if (field_b > max_b_field)
                 break;
 
-            if (((mask[i >> 6] >> (i & 63)) & 1) == 0)
+            if (fb + prefetch_depth < fa && test_mask_bit(mask, i + prefetch_depth)) { // Prefetch row only if no dropout
+                ffm_uint index_p = fb[prefetch_depth].index &  ffm_hash_mask;
+                ffm_uint field_p = fb[prefetch_depth].index >> ffm_hash_bits;
+
+                prefetch_interaction_weights(weights + index_p * index_stride + field_a * field_stride);
+                prefetch_interaction_weights(weights + index_a * index_stride + field_p * field_stride);
+            }
+
+            if (test_mask_bit(mask, i) == 0)
                 continue;
 
             //if (field_a == field_b)
@@ -128,25 +162,18 @@ ffm_float ffm_model::predict(const ffm_feature * start, const ffm_feature * end,
             ffm_float * wa = weights + index_a * index_stride + field_b * field_stride;
             ffm_float * wb = weights + index_b * index_stride + field_a * field_stride;
 
-            __m128 xmm_val = _mm_set1_ps(value_a * value_b / norm);
+            __m256 xmm_val = _mm256_set1_ps(value_a * value_b / norm);
 
-            for(ffm_uint d = 0; d < n_dim; d += 4) {
-                __m128 xmm_wa = _mm_load_ps(wa + d);
-                __m128 xmm_wb = _mm_load_ps(wb + d);
+            for(ffm_uint d = 0; d < n_dim; d += 8) {
+                __m256 xmm_wa = _mm256_load_ps(wa + d);
+                __m256 xmm_wb = _mm256_load_ps(wb + d);
 
-                xmm_total = _mm_add_ps(xmm_total, _mm_mul_ps(_mm_mul_ps(xmm_wa, xmm_wb), xmm_val));
+                xmm_total = _mm256_add_ps(xmm_total, _mm256_mul_ps(_mm256_mul_ps(xmm_wa, xmm_wb), xmm_val));
             }
         }
     }
 
-    xmm_total = _mm_hadd_ps(xmm_total, xmm_total);
-    xmm_total = _mm_hadd_ps(xmm_total, xmm_total);
-
-    ffm_float total;
-
-    _mm_store_ss(&total, xmm_total);
-
-    return total + linear_total;
+    return sum(xmm_total) + linear_total;
 }
 
 
@@ -180,7 +207,15 @@ void ffm_model::update(const ffm_feature * start, const ffm_feature * end, ffm_f
             if (field_b > max_b_field)
                 break;
 
-            if (((mask[i >> 6] >> (i & 63)) & 1) == 0)
+            if (fb + prefetch_depth < fa && test_mask_bit(mask, i + prefetch_depth)) { // Prefetch row only if no dropout
+                ffm_uint index_p = fb[prefetch_depth].index &  ffm_hash_mask;
+                ffm_uint field_p = fb[prefetch_depth].index >> ffm_hash_bits;
+
+                prefetch_interaction_weights(weights + index_p * index_stride + field_a * field_stride);
+                prefetch_interaction_weights(weights + index_a * index_stride + field_p * field_stride);
+            }
+
+            if (test_mask_bit(mask, i) == 0)
                 continue;
 
             //if (field_a == field_b)
@@ -194,24 +229,31 @@ void ffm_model::update(const ffm_feature * start, const ffm_feature * end, ffm_f
 
             __m256 xmm_kappa_val = _mm256_set1_ps(kappa * value_a * value_b / norm);
 
-            for(ffm_uint d = 0; d < n_dim; d += 4) {
+            for(ffm_uint d = 0; d < n_dim; d += 8) {
                 // Load weights
-                __m256 xmm_w = _mm256_set_m128(_mm_load_ps(wa + d), _mm_load_ps(wb + d));
-                __m256 xmm_wg = _mm256_set_m128(_mm_load_ps(wga + d), _mm_load_ps(wgb + d));
+                __m256 xmm_wa = _mm256_load_ps(wa + d);
+                __m256 xmm_wb = _mm256_load_ps(wb + d);
+
+                __m256 xmm_wga = _mm256_load_ps(wga + d);
+                __m256 xmm_wgb = _mm256_load_ps(wgb + d);
 
                 // Compute gradient values
-                __m256 xmm_g = _mm256_add_ps(_mm256_mul_ps(xmm_lambda, xmm_w), _mm256_mul_ps(xmm_kappa_val, _mm256_permute2f128_ps(xmm_w, xmm_w, 1)));
+                __m256 xmm_ga = _mm256_add_ps(_mm256_mul_ps(xmm_lambda, xmm_wa), _mm256_mul_ps(xmm_kappa_val, xmm_wb));
+                __m256 xmm_gb = _mm256_add_ps(_mm256_mul_ps(xmm_lambda, xmm_wb), _mm256_mul_ps(xmm_kappa_val, xmm_wa));
 
                 // Update weights
-                xmm_wg = _mm256_add_ps(xmm_wg, _mm256_mul_ps(xmm_g, xmm_g));
-                xmm_w  = _mm256_sub_ps(xmm_w, _mm256_mul_ps(xmm_eta, _mm256_mul_ps(_mm256_rsqrt_ps(xmm_wg), xmm_g)));
+                xmm_wga = _mm256_add_ps(xmm_wga, _mm256_mul_ps(xmm_ga, xmm_ga));
+                xmm_wgb = _mm256_add_ps(xmm_wgb, _mm256_mul_ps(xmm_gb, xmm_gb));
+
+                xmm_wa  = _mm256_sub_ps(xmm_wa, _mm256_mul_ps(xmm_eta, _mm256_mul_ps(_mm256_rsqrt_ps(xmm_wga), xmm_ga)));
+                xmm_wb  = _mm256_sub_ps(xmm_wb, _mm256_mul_ps(xmm_eta, _mm256_mul_ps(_mm256_rsqrt_ps(xmm_wgb), xmm_gb)));
 
                 // Store weights
-                _mm_store_ps(wa + d, _mm256_extractf128_ps(xmm_w, 1));
-                _mm_store_ps(wb + d, _mm256_extractf128_ps(xmm_w, 0));
+                _mm256_store_ps(wa + d, xmm_wa);
+                _mm256_store_ps(wb + d, xmm_wb);
 
-                _mm_store_ps(wga + d, _mm256_extractf128_ps(xmm_wg, 1));
-                _mm_store_ps(wgb + d, _mm256_extractf128_ps(xmm_wg, 0));
+                _mm256_store_ps(wga + d, xmm_wga);
+                _mm256_store_ps(wgb + d, xmm_wgb);
             }
         }
     }
