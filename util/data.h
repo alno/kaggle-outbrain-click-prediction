@@ -32,6 +32,20 @@ struct document {
 };
 
 
+// Small util
+
+
+namespace std {
+    template <typename A, typename B>
+    struct hash<std::pair<A, B>> {
+        std::size_t operator()(const std::pair<A, B>& k) const {
+          return std::hash<A>()(k.first) ^ (std::hash<B>()(k.second) >> 1);
+        }
+    };
+}
+
+
+
 // Functions to read data types
 
 
@@ -84,9 +98,25 @@ std::pair<int, std::pair<int, float>> read_document_annotation(const std::vector
     return std::make_pair(stoi(row[0]), std::make_pair(stoi(row[1]), stof(row[2])));
 }
 
-
 std::pair<int, int> read_count(const std::vector<std::string> & row) {
     return std::make_pair(stoi(row[0]), stoi(row[1]));
+}
+
+std::pair<std::pair<uint, uint>, std::vector<uint>> read_viewed_doc_one_hour_after(const std::vector<std::string> & row) {
+    using namespace std;
+
+    auto key = make_pair(stoi(row[0]), stoi(row[1]));
+    vector<uint> values;
+
+    stringstream ss;
+    ss.str(row[2]);
+
+    string item;
+    while (getline(ss, item, ' ')) {
+        values.push_back(stoi(item));
+    }
+
+    return make_pair(key, values);
 }
 
 
@@ -99,6 +129,7 @@ std::vector<ad> read_ads() {
 }
 
 
+
 // All data
 
 
@@ -109,6 +140,8 @@ struct reference_data {
     std::unordered_multimap<int, std::pair<int, float>> document_categories;
     std::unordered_multimap<int, std::pair<int, float>> document_topics;
     std::unordered_multimap<int, std::pair<int, float>> document_entities;
+
+    std::unordered_map<std::pair<uint, uint>, std::vector<uint>> viewed_docs_one_hour_after;
 };
 
 reference_data load_reference_data() {
@@ -119,19 +152,7 @@ reference_data load_reference_data() {
     res.document_categories = read_multi_map("../input/documents_categories.csv.gz", read_document_annotation);
     res.document_topics = read_multi_map("../input/documents_topics.csv.gz", read_document_annotation);
     res.document_entities = read_multi_map("cache/documents_entities.csv.gz", read_document_annotation);
+    res.viewed_docs_one_hour_after = read_map("cache/viewed_docs_one_hour_after.csv.gz", read_viewed_doc_one_hour_after);
 
     return res;
-}
-
-
-// Small util
-
-
-namespace std {
-    template <typename A, typename B>
-    struct hash<std::pair<A, B>> {
-        std::size_t operator()(const std::pair<A, B>& k) const {
-          return std::hash<A>()(k.first) ^ (std::hash<B>()(k.second) >> 1);
-        }
-    };
 }
