@@ -14,11 +14,11 @@
 #include <boost/program_options.hpp>
 
 // Batch configuration
-const ffm_uint batch_size = 10000;
-const ffm_uint mini_batch_size = 32;
+const ffm_uint batch_size = 20000;
+const ffm_uint mini_batch_size = 24;
 
 // Dropout configuration
-const ffm_uint dropout_mask_size = 100; // in 64-bit words
+const ffm_uint dropout_mask_size = 1000; // in 64-bit words
 const ffm_uint dropout_prob_log = 1; // 0.5 dropout rate
 const ffm_float dropout_norm_mult = ((1 << dropout_prob_log) - 1.0f) / (1 << dropout_prob_log);
 
@@ -55,8 +55,6 @@ std::vector<std::pair<ffm_ulong, ffm_ulong>> generate_mini_batches(ffm_ulong beg
 
     for (ffm_ulong mini_batch_start = begin; mini_batch_start < end; mini_batch_start += mini_batch_size)
         batches.push_back(std::make_pair(mini_batch_start, min(mini_batch_start + mini_batch_size, end)));
-
-    std::shuffle(batches.begin(), batches.end(), rnd);
 
     return batches;
 }
@@ -129,8 +127,8 @@ ffm_double compute_map(const ffm_index & index, const std::vector<ffm_float> & p
 
 
 template <typename M>
-ffm_double train_on_dataset(M & model, const ffm_dataset & dataset) {
-    clock_t begin = clock();
+ffm_double train_on_dataset(const std::vector<M*> & models, const ffm_dataset & dataset) {
+    time_t start_time = time(nullptr);
 
     std::cout << "  Training... ";
     std::cout.flush();
@@ -156,43 +154,53 @@ ffm_double train_on_dataset(M & model, const ffm_dataset & dataset) {
 
         uint64_t mask[dropout_mask_size];
 
-        for (auto mb = mini_batches.begin(); mb != mini_batches.end(); ++ mb) {
-            for (auto ei = mb->first; ei < mb->second; ++ ei) {
-                ffm_float y = dataset.index.labels[ei];
-                ffm_float norm = dataset.index.norms[ei] * dropout_norm_mult;
+        std::vector<float> ts(batch_end_index - batch_start_index);
+        std::vector<uint> tc(batch_end_index - batch_start_index);
 
-                auto start_offset = dataset.index.offsets[ei] - batch_start_offset;
-                auto end_offset = dataset.index.offsets[ei+1] - batch_start_offset;
 
-                auto feature_count = end_offset - start_offset;
-                auto interaction_count = feature_count * (feature_count + 1) / 2;
+        for (uint mi = 0; mi < models.size(); ++ mi) {
+            std::shuffle(mini_batches.begin(), mini_batches.end(), rnd);
 
-                fill_mask_rand(mask, (interaction_count + 63) / 64, dropout_prob_log);
+            for (auto mb = mini_batches.begin(); mb != mini_batches.end(); ++ mb) {
+                for (auto ei = mb->first; ei < mb->second; ++ ei) {
+                    ffm_float y = dataset.index.labels[ei];
+                    ffm_float norm = dataset.index.norms[ei] * dropout_norm_mult;
 
-                ffm_float t = model.predict(batch_features_data + start_offset, batch_features_data + end_offset, norm, mask);
-                ffm_float expnyt = exp(-y*t);
+                    auto start_offset = dataset.index.offsets[ei] - batch_start_offset;
+                    auto end_offset = dataset.index.offsets[ei+1] - batch_start_offset;
 
-                loss += log(1+expnyt);
+                    auto feature_count = end_offset - start_offset;
+                    auto interaction_count = feature_count * (feature_count + 1) / 2;
 
-                model.update(batch_features_data + start_offset, batch_features_data + end_offset, norm, -y * expnyt / (1+expnyt), mask);
+                    fill_mask_rand(mask, (interaction_count + 63) / 64, dropout_prob_log);
+
+                    float t = models[mi]->predict(batch_features_data + start_offset, batch_features_data + end_offset, norm, mask);
+                    float expnyt = exp(-y*t);
+
+                    models[mi]->update(batch_features_data + start_offset, batch_features_data + end_offset, norm, -y * expnyt / (1+expnyt), mask);
+
+                    uint i = ei - batch_start_index;
+                    ts[i] += t;
+                    tc[i] ++;
+                }
             }
         }
+
+        for (uint i = 0; i < batch_end_index - batch_start_index; ++ i)
+            loss += log(1+exp(-dataset.index.labels[i + batch_start_index]*ts[i]/tc[i]));
 
         cnt += batch_end_index - batch_start_index;
     }
 
-    clock_t end = clock();
-    int elapsed = (end - begin) / CLOCKS_PER_SEC;
-
-    std::cout << cnt << " examples processed in " << elapsed << " seconds, loss = " << std::fixed << std::setprecision(5) << (loss / cnt) << std::endl;
+    std::cout << cnt << " examples processed in " << (time(nullptr) - start_time) << " seconds, loss = " << std::fixed << std::setprecision(5) << (loss / cnt) << std::endl;
 
     return loss;
 }
 
 
 template <typename M>
-ffm_double evaluate_on_dataset(M & model, const ffm_dataset & dataset) {
-    clock_t begin = clock();
+ffm_double evaluate_on_dataset(const std::vector<M*> & models, const ffm_dataset & dataset) {
+    time_t start_time = time(nullptr);
 
     std::cout << "  Evaluating... ";
     std::cout.flush();
@@ -226,11 +234,16 @@ ffm_double evaluate_on_dataset(M & model, const ffm_dataset & dataset) {
             auto start_offset = dataset.index.offsets[ei] - batch_start_offset;
             auto end_offset = dataset.index.offsets[ei+1] - batch_start_offset;
 
-            ffm_float t = model.predict(batch_features_data + start_offset, batch_features_data + end_offset, norm, mask);
-            ffm_float expnyt = exp(-y*t);
+            float ts = 0.0;
+            uint tc = 0;
 
-            loss += log(1+expnyt);
-            predictions[ei] = 1 / (1+exp(-t));
+            for (uint mi = 0; mi < models.size(); ++ mi) {
+                ts += models[mi]->predict(batch_features_data + start_offset, batch_features_data + end_offset, norm, mask);
+                tc ++;
+            }
+
+            loss += log(1+exp(-y*ts/tc));
+            predictions[ei] = 1 / (1+exp(-ts/tc));
         }
 
         cnt += batch_end_index - batch_start_index;
@@ -239,17 +252,14 @@ ffm_double evaluate_on_dataset(M & model, const ffm_dataset & dataset) {
     // Compute map metric
     ffm_double map = compute_map(dataset.index, predictions);
 
-    clock_t end = clock();
-    int elapsed = (end - begin) / CLOCKS_PER_SEC;
-
-    std::cout << cnt << " examples processed in " << elapsed << " seconds, loss = " << std::fixed << std::setprecision(5) << (loss / cnt) << ", map = " << map << std::endl;
+    std::cout << cnt << " examples processed in " << (time(nullptr) - start_time) << " seconds, loss = " << std::fixed << std::setprecision(5) << (loss / cnt) << ", map = " << map << std::endl;
 
     return loss;
 }
 
 template <typename M>
-void predict_on_dataset(M & model, const ffm_dataset & dataset, std::ostream & out) {
-    clock_t begin = clock();
+void predict_on_dataset(const std::vector<M*> & models, const ffm_dataset & dataset, std::ostream & out) {
+    time_t start_time = time(nullptr);
 
     std::cout << "  Predicting... ";
     std::cout.flush();
@@ -278,18 +288,21 @@ void predict_on_dataset(M & model, const ffm_dataset & dataset, std::ostream & o
             auto start_offset = dataset.index.offsets[ei] - batch_start_offset;
             auto end_offset = dataset.index.offsets[ei+1] - batch_start_offset;
 
-            ffm_float t = model.predict(batch_features_data + start_offset, batch_features_data + end_offset, norm, mask);
+            float ts = 0.0;
+            uint tc = 0;
 
-            out << 1/(1+exp(-t)) << std::endl;
+            for (uint mi = 0; mi < models.size(); ++ mi) {
+                ts += models[mi]->predict(batch_features_data + start_offset, batch_features_data + end_offset, norm, mask);
+                tc ++;
+            }
+
+            out << 1/(1+exp(-ts/tc)) << std::endl;
         }
 
         cnt += batch_end_index - batch_start_index;
     }
 
-    clock_t end = clock();
-    int elapsed = (end - begin) / CLOCKS_PER_SEC;
-
-    std::cout << cnt << " examples processed in " << elapsed << " seconds" << std::endl;
+    std::cout << cnt << " examples processed in " << (time(nullptr) - start_time) << " seconds" << std::endl;
 }
 
 
@@ -320,11 +333,12 @@ public:
 
     uint n_epochs;
     uint n_threads;
+    uint n_models;
     uint seed;
 
     bool restricted;
 public:
-    program_options(int ac, char* av[]): desc("Allowed options"), model_name("ffm"), n_epochs(10), n_threads(4), seed(2017) {
+    program_options(int ac, char* av[]): desc("Allowed options"), model_name("ffm"), n_epochs(10), n_threads(4), n_models(1), seed(2017) {
         using namespace boost::program_options;
 
         desc.add_options()
@@ -336,6 +350,7 @@ public:
             ("pred", value<std::string>(&pred_file_name), "file to save predictions")
             ("epochs", value<uint>(&n_epochs), "number of epochs (default 10)")
             ("threads", value<uint>(&n_threads), "number of threads (default 4)")
+            ("average", value<uint>(&n_models), "number of models to average (default 1)")
             ("seed", value<uint>(&seed), "random seed")
             ("restricted", "restrict feature interactions to (E+C) * (C+A)")
         ;
@@ -356,7 +371,7 @@ public:
 
 
 template <typename M>
-void apply(M & model, program_options & opts) {
+void apply(const std::vector<M*> & models, program_options & opts) {
     using namespace std;
 
     if (opts.val_file_name.empty()) { // No validation set given, just train
@@ -365,7 +380,7 @@ void apply(M & model, program_options & opts) {
         for (ffm_uint epoch = 0; epoch < opts.n_epochs; ++ epoch) {
             cout << "Epoch " << epoch << "..." << endl;
 
-            train_on_dataset(model, ds_train);
+            train_on_dataset(models, ds_train);
         }
     } else { // Train with validation each epoch
         auto ds_train = open_dataset(opts.train_file_name);
@@ -374,8 +389,8 @@ void apply(M & model, program_options & opts) {
         for (ffm_uint epoch = 0; epoch < opts.n_epochs; ++ epoch) {
             cout << "Epoch " << epoch << "..." << endl;
 
-            train_on_dataset(model, ds_train);
-            evaluate_on_dataset(model, ds_val);
+            train_on_dataset(models, ds_train);
+            evaluate_on_dataset(models, ds_val);
         }
     }
 
@@ -383,7 +398,7 @@ void apply(M & model, program_options & opts) {
         auto ds_test = open_dataset(opts.test_file_name);
 
         ofstream out(opts.pred_file_name);
-        predict_on_dataset(model, ds_test, out);
+        predict_on_dataset(models, ds_test, out);
     }
 }
 
@@ -397,8 +412,12 @@ int main(int ac, char* av[]) {
 
     // Run model
     if (opts.model_name == "ffm") {
-        ffm_model model(opts.seed + 100, opts.restricted);
-        apply(model, opts);
+        std::vector<ffm_model*> models;
+
+        for (uint i = 0; i < opts.n_models; ++ i)
+            models.push_back(new ffm_model(opts.seed + 100 + i * 17, opts.restricted));
+
+        apply(models, opts);
     } else {
         throw std::runtime_error(std::string("Unknown model ") + opts.model_name);
     }
