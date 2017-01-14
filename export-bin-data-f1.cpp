@@ -274,17 +274,17 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     */
 
     // Ad features
-    features.hashed(20, ad_count.min_count < 5 ? ad_count.sum_count : ad_id + 100);
-    features.hashed(21, ad_campaign_count.min_count < 5 ? ad_campaign_count.sum_count : ad.campaign_id + 100);
-    features.hashed(22, ad_advertiser_count.min_count < 5 ? ad_advertiser_count.sum_count : ad.advertiser_id + 100);
+    features.hashed(30, ad_count.min_count < 5 ? ad_count.sum_count : ad_id + 100);
+    features.hashed(31, ad_campaign_count.min_count < 5 ? ad_campaign_count.sum_count : ad.campaign_id + 100);
+    features.hashed(32, ad_advertiser_count.min_count < 5 ? ad_advertiser_count.sum_count : ad.advertiser_id + 100);
 
     // Promoted document info
-    features.hashed(23, ad_doc_count.min_count < 5 ? ad_doc_count.sum_count : ad.document_id + 100);
-    features.hashed(24, ad_doc_source_count.min_count < 5 ? ad_doc_source_count.sum_count : ad_doc.source_id + 10);
-    features.hashed(25, ad_doc_publisher_count.min_count < 5 ? ad_doc_publisher_count.sum_count : ad_doc.publisher_id + 10);
+    features.hashed(33, ad_doc_count.min_count < 5 ? ad_doc_count.sum_count : ad.document_id + 100);
+    features.hashed(34, ad_doc_source_count.min_count < 5 ? ad_doc_source_count.sum_count : ad_doc.source_id + 10);
+    features.hashed(35, ad_doc_publisher_count.min_count < 5 ? ad_doc_publisher_count.sum_count : ad_doc.publisher_id + 10);
 
     for (auto it = ad_doc_categories.first; it != ad_doc_categories.second; ++ it)
-        features.hashed(26, it->second.first, it->second.second);
+        features.hashed(36, it->second.first, it->second.second);
     /*
     for (auto it = ad_doc_topics.first; it != ad_doc_topics.second; ++ it)
         features.hashed(15, it->second.first, it->second.second);

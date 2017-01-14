@@ -246,20 +246,20 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     */
 
     // Ad features
-    features.hashed(20, ad_count < 50 ? ad_count : ad_id + 100);
-    features.hashed(21, ad_campaign_count < 50 ? ad_campaign_count : ad.campaign_id + 100);
-    features.hashed(22, ad_advertiser_count < 50 ? ad_advertiser_count : ad.advertiser_id + 100);
+    features.hashed(30, ad_count < 50 ? ad_count : ad_id + 100);
+    features.hashed(31, ad_campaign_count < 50 ? ad_campaign_count : ad.campaign_id + 100);
+    features.hashed(32, ad_advertiser_count < 50 ? ad_advertiser_count : ad.advertiser_id + 100);
 
     // Promoted document info
-    features.hashed(23, ad_doc_count < 50 ? ad_doc_count : ad.document_id + 100);
-    features.hashed(24, ad_doc_source_count < 10 ? ad_doc_source_count : ad_doc.source_id + 10);
-    features.hashed(25, ad_doc_publisher_count < 10 ? ad_doc_publisher_count : ad_doc.publisher_id + 10);
+    features.hashed(33, ad_doc_count < 50 ? ad_doc_count : ad.document_id + 100);
+    features.hashed(34, ad_doc_source_count < 10 ? ad_doc_source_count : ad_doc.source_id + 10);
+    features.hashed(35, ad_doc_publisher_count < 10 ? ad_doc_publisher_count : ad_doc.publisher_id + 10);
 
     for (auto it = ad_doc_categories.first; it != ad_doc_categories.second; ++ it)
-        features.hashed(26, it->second.first, it->second.second);
+        features.hashed(36, it->second.first, it->second.second);
 
     for (auto it = ad_doc_topics.first; it != ad_doc_topics.second; ++ it)
-        features.hashed(27, it->second.first, it->second.second);
+        features.hashed(37, it->second.first, it->second.second);
     /*
     for (auto it = ad_doc_entities.first; it != ad_doc_entities.second; ++ it)
         features.hashed(17, it->second.first, it->second.second);

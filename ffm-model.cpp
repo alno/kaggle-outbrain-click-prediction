@@ -16,7 +16,7 @@
 constexpr ffm_uint align_bytes = 32;
 constexpr ffm_uint align_floats = align_bytes / sizeof(ffm_float);
 
-constexpr ffm_ulong n_fields = 30;
+constexpr ffm_ulong n_fields = 40;
 constexpr ffm_ulong n_features = 1 << ffm_hash_bits;
 
 constexpr ffm_ulong n_dim = 14;
@@ -95,7 +95,7 @@ ffm_model::ffm_model(int seed, bool restricted, float eta, float lambda) {
     this->lambda = lambda;
 
     if (restricted) {
-        max_b_field = 19;
+        max_b_field = 29;
         min_a_field = 10;
     } else {
         max_b_field = n_fields;

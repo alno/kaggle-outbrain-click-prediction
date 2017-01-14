@@ -17,7 +17,8 @@ std::vector<std::pair<std::string, std::string>> files = {
 std::vector<std::string> features = {
     "leak",
     "viewed_docs", "viewed_categories", "viewed_topics",
-    "uid_viewed_ads", "uid_viewed_ad_srcs", "uid_viewed_ad_cats", "uid_viewed_ad_tops"
+    "uid_viewed_ads", "uid_viewed_ad_srcs", "uid_viewed_ad_cats", "uid_viewed_ad_tops",
+    "rivals"
 };
 
 std::string cur_dataset;
@@ -216,6 +217,8 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     features.raw(14, 80, pos_time_diff(event.timestamp - ad_doc.publish_timestamp));
     features.raw(14, 81, time_diff(ev_doc.publish_timestamp - ad_doc.publish_timestamp));
 
+    features.raw(18, stoi(rows[9][0]) + 180); // Rival count
+
     // Similarity features
     /*
     for (uint i = 0; i < rows[2].size(); ++ i)
@@ -224,17 +227,17 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     */
 
     // Ad features
-    features.hashed(20, ad_count < 50 ? ad_count : ad_id + 100);
-    features.hashed(21, ad_campaign_count < 50 ? ad_campaign_count : ad.campaign_id + 100);
-    features.hashed(22, ad_advertiser_count < 50 ? ad_advertiser_count : ad.advertiser_id + 100);
+    features.hashed(30, ad_count < 50 ? ad_count : ad_id + 100);
+    features.hashed(31, ad_campaign_count < 50 ? ad_campaign_count : ad.campaign_id + 100);
+    features.hashed(32, ad_advertiser_count < 50 ? ad_advertiser_count : ad.advertiser_id + 100);
 
     // Promoted document info
-    features.hashed(23, ad_doc_count < 50 ? ad_doc_count : ad.document_id + 100);
-    features.hashed(24, ad_doc_source_count < 10 ? ad_doc_source_count : ad_doc.source_id + 10);
-    features.hashed(25, ad_doc_publisher_count < 10 ? ad_doc_publisher_count : ad_doc.publisher_id + 10);
+    features.hashed(33, ad_doc_count < 50 ? ad_doc_count : ad.document_id + 100);
+    features.hashed(34, ad_doc_source_count < 10 ? ad_doc_source_count : ad_doc.source_id + 10);
+    features.hashed(35, ad_doc_publisher_count < 10 ? ad_doc_publisher_count : ad_doc.publisher_id + 10);
 
     for (auto it = ad_doc_categories.first; it != ad_doc_categories.second; ++ it)
-        features.hashed(26, it->second.first, it->second.second);
+        features.hashed(36, it->second.first, it->second.second);
     /*
     for (auto it = ad_doc_topics.first; it != ad_doc_topics.second; ++ it)
         features.hashed(15, it->second.first, it->second.second);
