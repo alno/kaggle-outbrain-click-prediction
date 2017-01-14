@@ -49,6 +49,15 @@ struct counts {
     C future_all;
 };
 
+template <typename C>
+struct restricted_counts {
+    C past;
+    C past_pos;
+
+    C future;
+    C future_pos;
+};
+
 
 
 template <typename C>
@@ -522,6 +531,91 @@ public:
     }
 };
 
+
+template <typename C>
+class ad_doc_bag_writer {
+    std::unordered_map<int, std::unordered_map<int, restricted_counts<C>>> ad_counts;
+public:
+    std::string get_header() {
+        return "ad_doc_bag_past,ad_doc_bag_past_clicked,ad_doc_bag_future,ad_doc_bag_future_clicked";
+    }
+
+    void write(std::ostream & out, int group_id, int ad_id) {
+        using namespace std;
+
+        auto & grp_map = ad_counts[group_id];
+
+        stringstream past_stream, past_clicked_stream, future_stream, future_clicked_stream;
+
+        for (auto it = grp_map.begin(); it != grp_map.end(); ++ it) {
+            auto & cnt = it->second;
+
+            if (cnt.past > 0)
+                past_stream << it->first << " ";
+
+            if (cnt.past_pos > 0)
+                past_clicked_stream << it->first << " ";
+
+            if (cnt.future > 0)
+                future_stream << it->first << " ";
+
+            if (cnt.future_pos > 0)
+                future_clicked_stream << it->first << " ";
+        }
+
+        auto past_str = past_stream.str();
+        auto past_clicked_str = past_clicked_stream.str();
+        auto future_str = future_stream.str();
+        auto future_clicked_str = future_clicked_stream.str();
+
+        if (!past_str.empty())
+            past_str.pop_back();
+
+        if (!past_clicked_str.empty())
+            past_clicked_str.pop_back();
+
+        if (!future_str.empty())
+            future_str.pop_back();
+
+        if (!future_clicked_str.empty())
+            future_clicked_str.pop_back();
+
+        out << past_str << "," << past_clicked_str << "," << future_str << "," << future_clicked_str << endl;
+    }
+
+    void update_past(int group_id, int ad_id, int clicked) {
+        using namespace std;
+
+        auto & ad_cnt = ad_counts[group_id][ads[ad_id].document_id];
+
+        if (ad_cnt.past == numeric_limits<C>::max())
+            throw std::logic_error("Positive overflow");
+
+        ++ ad_cnt.past;
+
+        if (clicked > 0) {
+            ++ ad_cnt.past_pos;
+        }
+    }
+
+    void update_future(int group_id, int ad_id, int clicked, int sign) {
+        using namespace std;
+
+        auto & ad_cnt = ad_counts[group_id][ads[ad_id].document_id];
+
+        if (sign > 0 && ad_cnt.future == numeric_limits<C>::max())
+            throw std::logic_error("Positive overflow");
+        else if (sign < 0 && ad_cnt.future == numeric_limits<C>::min())
+            throw std::logic_error("Negative overflow");
+
+        ad_cnt.future += sign;
+
+        if (clicked > 0) {
+            ad_cnt.future_pos += sign;
+        }
+    }
+};
+
 //////////////////////
 
 
@@ -733,6 +827,8 @@ int main() {
     generate_all<campaign_writer<uint32_t>>(g2_extractor, "g2_viewed_ad_cmps");
     generate_all<category_writer>(g2_extractor, "g2_viewed_ad_cats");
     generate_all<topic_writer>(g2_extractor, "g2_viewed_ad_tops");
+
+    generate_all<ad_doc_bag_writer<uint8_t>>(uid_extractor, "uid_viewed_ad_bags");
 
     cout << "Done." << endl;
 }
