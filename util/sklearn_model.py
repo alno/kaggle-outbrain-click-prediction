@@ -5,7 +5,7 @@ class SklearnModel(object):
     def __init__(self, model):
         self.model = model
 
-    def fit(self, train_X, train_y, eval_X=None, eval_y=None, eval_g=None):
+    def fit(self, train_X, train_y, train_g=None, eval_X=None, eval_y=None, eval_g=None):
         self.model.fit(train_X, train_y)
         return self
 

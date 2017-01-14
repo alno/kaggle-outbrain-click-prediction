@@ -48,7 +48,7 @@ class KerasModel(object):
         self.arch = nn_mlp_2
         self.params = params
 
-    def fit(self, train_X, train_y, eval_X=None, eval_y=None, eval_g=None):
+    def fit(self, train_X, train_y, train_g=None, eval_X=None, eval_y=None, eval_g=None):
         self.model = self.arch((train_X.shape[1],), self.params)
         self.model.compile(optimizer='adadelta', loss='binary_crossentropy')
 

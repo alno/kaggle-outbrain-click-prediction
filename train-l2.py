@@ -7,6 +7,7 @@ from util.meta import full_split, cv1_split, cv1_split_time, test_split_time
 from util import gen_prediction_name, gen_submission, score_sorted
 from util.sklearn_model import SklearnModel
 from util.keras_model import KerasModel
+from util.xgb_model import XgbModel
 
 from sklearn.model_selection import GroupKFold
 from sklearn.linear_model import LogisticRegression
@@ -45,7 +46,8 @@ preds = [
 
 models = {
     'lr': lambda: SklearnModel(LogisticRegression(C=0.01)),
-    'nn': lambda: KerasModel(batch_size=128, layers=[40, 10], dropouts=[0.3, 0.1], n_epoch=1)
+    'nn': lambda: KerasModel(batch_size=128, layers=[40, 10], dropouts=[0.3, 0.1], n_epoch=1),
+    'xgb': lambda: XgbModel(n_iter=1500, silent=1, objective='binary:logistic', eval_metric='logloss', seed=144, max_depth=4, colsample_bytree=0.5, subsample=0.25, tree_method='exact', eta=0.05)
 }
 
 model_name = sys.argv[1]
@@ -72,13 +74,14 @@ def fit_present_model(events, train_X, train_y, train_event):
     for k, (idx_train, idx_test) in enumerate(folds):
         fold_train_X = present_train_X[idx_train]
         fold_train_y = present_train_y[idx_train]
+        fold_train_g = present_train_g[idx_train]
 
         fold_val_X = present_train_X[idx_test]
         fold_val_y = present_train_y[idx_test]
         fold_val_g = present_train_g[idx_test]
 
         model = model_factory()
-        model.fit(fold_train_X, fold_train_y, fold_val_X, fold_val_y, fold_val_g)
+        model.fit(fold_train_X, fold_train_y, fold_train_g, fold_val_X, fold_val_y, fold_val_g)
 
         pred = model.predict(fold_val_X)
 
@@ -89,7 +92,7 @@ def fit_present_model(events, train_X, train_y, train_event):
 
     print "  Present map score: %.7f +- %.7f" % (np.mean(map_scores), np.std(map_scores))
 
-    return model_factory().fit(present_train_X, present_train_y), np.mean(map_scores)
+    return model_factory().fit(present_train_X, present_train_y, fold_train_g), np.mean(map_scores)
 
 
 def fit_future_model(events, train_X, train_y, train_event):
@@ -103,13 +106,14 @@ def fit_future_model(events, train_X, train_y, train_event):
 
     future_train_X = train_X[train_is_future_train].values
     future_train_y = train_y[train_is_future_train].values
+    future_train_g = train_event[train_is_future_train].values
 
     future_val_X = train_X[train_is_future_val].values
     future_val_y = train_y[train_is_future_val].values
     future_val_g = train_event[train_is_future_val].values
 
     model = model_factory()
-    model.fit(future_train_X, future_train_y, future_val_X, future_val_y, future_val_g)
+    model.fit(future_train_X, future_train_y, future_train_g, future_val_X, future_val_y, future_val_g)
 
     pred = model.predict(future_val_X)
 
@@ -120,8 +124,9 @@ def fit_future_model(events, train_X, train_y, train_event):
 
     future_all_X = train_X[train_is_future_all].values
     future_all_y = train_y[train_is_future_all].values
+    future_all_g = train_event[train_is_future_all].values
 
-    return model_factory().fit(future_all_X, future_all_y), map_score
+    return model_factory().fit(future_all_X, future_all_y, future_all_g), map_score
 
 
 def load_x(ds):
