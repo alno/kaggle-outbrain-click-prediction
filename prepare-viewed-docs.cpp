@@ -11,6 +11,12 @@ std::vector<std::pair<std::string, std::string>> filesets {
     { "../input/clicks_test.csv.gz", "full_test" },
 };
 
+std::vector<int> max_timestamps = {
+    1123200000,
+    1123200000,
+    std::numeric_limits<int>::max()
+};
+
 struct event_info {
     int uid;
     int timestamp;
@@ -176,7 +182,7 @@ public:
 
 
 template <typename W>
-void generate(const std::string & file_name_prefix) {
+void generate(const std::string & file_name_prefix, uint ofs) {
     using namespace std;
 
     cout << "Generating " << file_name_prefix << "..." << endl;
@@ -184,13 +190,15 @@ void generate(const std::string & file_name_prefix) {
     W w;
 
     cout << "  Loading click data..." << endl;
-    for (auto it = filesets.begin(); it != filesets.end(); ++ it) {
-        cout << "    Loading " << it->first << "... ";
+    for (uint fi = ofs; fi < ofs + 2; ++ fi) {
+        auto in_file_name = filesets[fi].first;
+
+        cout << "    Loading " << in_file_name << "... ";
         cout.flush();
 
-        clock_t begin = clock();
+        time_t begin = time(nullptr);
 
-        compressed_csv_file file(it->first);
+        compressed_csv_file file(in_file_name);
 
         for (int i = 0;; ++i) {
             auto row = file.getrow();
@@ -209,20 +217,18 @@ void generate(const std::string & file_name_prefix) {
             }
         }
 
-        clock_t end = clock();
-        double elapsed = double(end - begin) / CLOCKS_PER_SEC;
-
-        cout << "done in " << elapsed << " seconds" << endl;
+        cout << "done in " << (time(nullptr) - begin) << " seconds" << endl;
     }
 
     {
         cout << "  Processing page views data... ";
         cout.flush();
 
-        clock_t begin = clock();
+        time_t begin = time(nullptr);
 
         compressed_csv_file file("../input/page_views.csv.gz");
         int found = 0;
+        int max_timestamp = max_timestamps[ofs / 2];
 
         for (int i = 0;; ++i) {
             auto row = file.getrow();
@@ -234,10 +240,12 @@ void generate(const std::string & file_name_prefix) {
             auto document_id = stoi(row[1]);
             auto timestamp = stoi(row[2]);
 
-            // Register view
-            auto uid_it = uuid_map.find(uuid);
-            if (uid_it != uuid_map.end()) {
-                w.update(uid_it->second, document_id, timestamp);
+            if (timestamp <= max_timestamp) {
+                // Register view
+                auto uid_it = uuid_map.find(uuid);
+                if (uid_it != uuid_map.end()) {
+                    w.update(uid_it->second, document_id, timestamp);
+                }
             }
 
             if (i > 0 && i % 5000000 == 0) {
@@ -246,22 +254,19 @@ void generate(const std::string & file_name_prefix) {
             }
         }
 
-        clock_t end = clock();
-        double elapsed = double(end - begin) / CLOCKS_PER_SEC;
-
-        cout << "done in " << elapsed << " seconds, found " << found << " entries" << endl;
+        cout << "done in " << (time(nullptr) - begin) << " seconds, found " << found << " entries" << endl;
     }
 
     cout << "  Generating viewed docs features..." << endl;
-    for (auto it = filesets.begin(); it != filesets.end(); ++ it) {
-        auto out_file_name = string("cache/") + file_name_prefix + string("_") + it->second + string(".csv.gz");
+    for (uint fi = ofs; fi < ofs + 2; ++ fi) {
+        auto out_file_name = string("cache/") + file_name_prefix + string("_") + filesets[fi].second + string(".csv.gz");
 
         cout << "  Generating " << out_file_name << "... ";
         cout.flush();
 
-        clock_t begin = clock();
+        time_t begin = time(nullptr);
 
-        compressed_csv_file file(it->first);
+        compressed_csv_file file(filesets[fi].first);
 
         boost::iostreams::filtering_ostream out;
         out.push(boost::iostreams::gzip_compressor(), buffer_size, buffer_size);
@@ -286,10 +291,7 @@ void generate(const std::string & file_name_prefix) {
             }
         }
 
-        clock_t end = clock();
-        double elapsed = double(end - begin) / CLOCKS_PER_SEC;
-
-        cout << "done in " << elapsed << " seconds" << endl;
+        cout << "done in " << (time(nullptr) - begin) << " seconds" << endl;
     }
 }
 
@@ -304,9 +306,11 @@ int main() {
     document_categories = read_multi_map("../input/documents_categories.csv.gz", read_document_annotation);
     document_topics = read_multi_map("../input/documents_topics.csv.gz", read_document_annotation);
 
-    generate<doc_source_writer>("viewed_docs");
-    generate<doc_category_writer>("viewed_categories");
-    generate<doc_topic_writer>("viewed_topics");
+    for (uint ofs = 0; ofs < filesets.size(); ofs += 2) {
+        generate<doc_source_writer>("viewed_docs", ofs);
+        generate<doc_category_writer>("viewed_categories", ofs);
+        generate<doc_topic_writer>("viewed_topics", ofs);
+    }
 
     cout << "Done." << endl;
 }
