@@ -12,59 +12,73 @@ def fit_predict(profile, split, split_name):
     train_file = 'cache/%s_train_bin_%s' % (split_name, profile['dataset'])
     pred_file = 'cache/%s_test_bin_%s' % (split_name, profile['dataset'])
 
-    opts = profile['options']
-    opts += " --epochs %d" % profile['epochs']
+    n_bags = profile.get('bags', 1)
 
-    if split_name != "full":
-        opts += " --val %s" % pred_file
+    pred = None
+    for i in xrange(n_bags):
+        opts = profile.get('options', '')
+        opts += " --seed %d --epochs %d" % (profile['seed'] + i * 3407, profile['epochs'])
 
-    print_and_exec("bin/ffm %s --train %s --test %s --pred  /tmp/ffm2.preds" % (opts, train_file, pred_file))
+        if split_name != "full":
+            opts += " --val %s" % pred_file
 
-    pred = pd.read_csv(split[1])
-    pred['pred'] = np.loadtxt('/tmp/ffm2.preds')
+        print_and_exec("bin/ffm %s --train %s --test %s --pred  /tmp/ffm2.preds" % (opts, train_file, pred_file))
 
-    return pred
+        if pred is None:
+            pred = np.loadtxt('/tmp/ffm2.preds')
+        else:
+            pred += np.loadtxt('/tmp/ffm2.preds')
+
+    pred_df = pd.read_csv(split[1])
+    pred_df['pred'] = pred / n_bags
+
+    return pred_df
 
 
 profiles = {
     'p1': {
         'epochs': 4,
-        'options': "--seed 2017",
+        'seed': 2017,
         'dataset': "p1",
     },
 
     'p1r': {
         'epochs': 4,
-        'options': "--restricted --seed 123",
+        'seed': 123,
+        'options': "--restricted",
         'dataset': "p1",
     },
 
     'f1': {
         'epochs': 4,
-        'options': "--seed 42",
+        'seed': 42,
         'dataset': "f1",
     },
 
-    'f1-2': {
-        'options': "--epochs 5 --seed 2143",
+    'f1b': {
+        'bags': 3,
+        'epochs': 4,
+        'seed': 178,
         'dataset': "f1",
     },
 
     'f1r': {
         'epochs': 4,
-        'options': "--restricted --seed 71",
+        'seed': 71,
+        'options': "--restricted",
         'dataset': "f1",
     },
 
     'f2': {
         'epochs': 4,
-        'options': "--seed 456",
+        'seed': 456,
         'dataset': "f2",
     },
 
     'f2r': {
         'epochs': 4,
-        'options': "--restricted --seed 456",
+        'seed': 879,
+        'options': "--restricted",
         'dataset': "f2",
     },
 }
