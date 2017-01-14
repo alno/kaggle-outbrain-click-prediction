@@ -14,14 +14,19 @@ void write_rivals(std::ostream & out, const std::vector<uint> rivals) {
     for (uint i = 0; i < rivals.size(); ++ i) {
         out << rivals.size() << ",";
 
+        uint w = 0;
         for (uint j = 0; j < rivals.size(); ++ j) {
-            if (j > 0)
-                out << " ";
+            if (i != j) {
+                if (w > 0)
+                    out << " ";
 
-            out << rivals[j];
+                out << rivals[j];
+
+                w ++;
+            }
         }
 
-        out << std::endl;
+        out << "," << i << std::endl;
     }
 }
 
@@ -48,7 +53,7 @@ int main() {
 
         std::ostream out(&buf);
 
-        out << "rival_count,rivals" << endl;
+        out << "rival_count,rivals,rank" << endl;
 
         uint cur_group_id = 0;
         std::vector<uint> cur_rivals;

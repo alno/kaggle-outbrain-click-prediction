@@ -102,21 +102,36 @@ std::pair<int, int> read_count(const std::vector<std::string> & row) {
     return std::make_pair(stoi(row[0]), stoi(row[1]));
 }
 
-std::pair<std::pair<uint, uint>, std::vector<uint>> read_viewed_doc_one_hour_after(const std::vector<std::string> & row) {
+std::vector<uint> parse_id_list(const std::string & field) {
     using namespace std;
 
-    auto key = make_pair(stoi(row[0]), stoi(row[1]));
     vector<uint> values;
 
     stringstream ss;
-    ss.str(row[2]);
+    ss.str(field);
 
     string item;
     while (getline(ss, item, ' ')) {
         values.push_back(stoi(item));
     }
 
-    return make_pair(key, values);
+    return values;
+}
+
+std::pair<std::pair<uint, uint>, std::vector<uint>> read_viewed_doc_one_hour_after(const std::vector<std::string> & row) {
+    using namespace std;
+
+    auto key = make_pair(stoi(row[0]), stoi(row[1]));
+    auto val = parse_id_list(row[2]);
+
+    return make_pair(key, val);
+}
+
+
+std::pair<uint, std::vector<uint>> read_doc_ad_others(const std::vector<std::string> & row) {
+    using namespace std;
+
+    return make_pair(stoi(row[0]), parse_id_list(row[1]));
 }
 
 
@@ -142,6 +157,7 @@ struct reference_data {
     std::unordered_multimap<int, std::pair<int, float>> document_entities;
 
     std::unordered_map<std::pair<uint, uint>, std::vector<uint>> viewed_docs_one_hour_after;
+    std::unordered_map<uint, std::vector<uint>> doc_ad_others;
 };
 
 reference_data load_reference_data() {
@@ -153,6 +169,7 @@ reference_data load_reference_data() {
     res.document_topics = read_multi_map("../input/documents_topics.csv.gz", read_document_annotation);
     res.document_entities = read_multi_map("cache/documents_entities.csv.gz", read_document_annotation);
     res.viewed_docs_one_hour_after = read_map("cache/viewed_docs_one_hour_after.csv.gz", read_viewed_doc_one_hour_after);
+    res.doc_ad_others = read_map("cache/doc_ad_others.csv.gz", read_doc_ad_others);
 
     return res;
 }
