@@ -25,6 +25,10 @@ inline float sum(__m256 val) {
     return sum;
 }
 
+constexpr uint aligned_float_array_size(uint cnt) {
+    return ((cnt - 1) / align_floats + 1) * align_floats;
+}
+
 
 template <typename T>
 inline T * malloc_aligned(size_t size) {
@@ -53,7 +57,7 @@ static void fill_with_rand(ffm_float * weights, ffm_uint n, D gen, std::default_
     ffm_float * w = weights;
 
     for(ffm_uint i = 0; i < n; i++) {
-        *w++ = 1.0;//gen(rnd);
+        *w++ = gen(rnd);
     }
 }
 
@@ -81,4 +85,13 @@ inline T min(T a, T b) {
 template <typename T>
 inline int sgn(T val) {
     return (T(0) < val) - (val < T(0));
+}
+
+
+inline float relu(float val) {
+    return val > 0 ? val : 0;
+}
+
+inline bool isnan(float val) {
+    return val != val;
 }

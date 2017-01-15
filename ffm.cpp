@@ -1,7 +1,9 @@
 #include "ffm.h"
 
 #include "ffm-model.h"
+#include "ffm-nn-model.h"
 #include "ftrl-model.h"
+#include "nn-model.h"
 
 #include <iostream>
 #include <iomanip>
@@ -419,11 +421,25 @@ int main(int ac, char* av[]) {
             models.push_back(new ffm_model(opts.seed + 100 + i * 17, opts.restricted));
 
         apply(models, opts);
+    } else if (opts.model_name == "ffm-nn") {
+        std::vector<ffm_nn_model*> models;
+
+        for (uint i = 0; i < opts.n_models; ++ i)
+            models.push_back(new ffm_nn_model(opts.seed + 100 + i * 17, opts.restricted));
+
+        apply(models, opts);
     } else if (opts.model_name == "ftrl") {
         std::vector<ftrl_model*> models;
 
         for (uint i = 0; i < opts.n_models; ++ i)
             models.push_back(new ftrl_model(24, 1.0, 2.0, 2e-4, 5e-4));
+
+        apply(models, opts);
+    } else if (opts.model_name == "nn") {
+        std::vector<nn_model*> models;
+
+        for (uint i = 0; i < opts.n_models; ++ i)
+            models.push_back(new nn_model(opts.seed + 100 + i * 17));
 
         apply(models, opts);
     } else {
