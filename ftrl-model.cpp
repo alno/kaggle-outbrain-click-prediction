@@ -8,43 +8,8 @@
 #include <algorithm>
 
 
-template <typename T>
-inline int sgn(T val) {
-    return (T(0) < val) - (val < T(0));
-}
-
-
-template <typename T>
-class local_weight_vector {
-    T * w;
-    uint sz;
-public:
-    local_weight_vector() {
-        w = nullptr;
-        sz = 0;
-    }
-
-    ~local_weight_vector() {
-        if (w != nullptr) free(w);
-    }
-
-    T * get(uint size) {
-        if (w == nullptr) {
-            w = malloc_aligned<T>(size);
-
-            zero_weights(w, size);
-
-            sz = size;
-        } else if (sz != size) {
-            throw std::logic_error("Weights are already initialized with other size!");
-        }
-
-        return w;
-    }
-};
-
-
 constexpr uint feature_buffer_size = 100000;
+
 
 uint max_b_field = 29;
 uint min_a_field = 10;
@@ -83,7 +48,6 @@ public:
 };
 
 
-static thread_local local_weight_vector<float> local_weights;
 static thread_local feature_buffer local_feature_buffer;
 
 
@@ -120,7 +84,7 @@ float ftrl_model::predict(const ffm_feature * start, const ffm_feature * end, ff
     int i = 0;
     for (const ffm_feature * fa = start; fa != end; ++ fa) {
         feature_buf.add(fa->index & mask, fa->value);
-
+/*
         if ((fa->index >> ffm_hash_bits) < min_a_field)
             continue;
 
@@ -132,7 +96,7 @@ float ftrl_model::predict(const ffm_feature * start, const ffm_feature * end, ff
                 continue;
 
             feature_buf.add((fa->index + fb->index * 2654435761) & mask, fa->value * fb->value);
-        }
+        }*/
     }
 
     uint feature_count = feature_buf.size;
@@ -167,21 +131,34 @@ void ftrl_model::update(const ffm_feature * start, const ffm_feature * end, ffm_
     auto & feature_buf = local_feature_buffer;
 
     uint feature_count = feature_buf.size;
-    uint * feature_indices = feature_buf.indices;
-    float * feature_values = feature_buf.values;
-    float * feature_weights = feature_buf.weights;
 
-    for (uint i = 0; i < feature_count; ++ i) {
-        uint  feature_index = feature_indices[i];
-        float feature_grad = grad * feature_values[i];
+    uint  * fi = feature_buf.indices;
+    float * fv = feature_buf.values;
+    float * fw = feature_buf.weights;
 
-        float feature_grad_sqr = feature_grad * feature_grad;
+    float * n = weights_n;
 
-        float n = weights_n[feature_index];
+    __m256 ymm_alpha = _mm256_set1_ps(alpha);
+    __m256 ymm_grad = _mm256_set1_ps(grad);
 
-        float sigma = (sqrt(n + feature_grad_sqr) - sqrt(n)) / alpha;
+    for (uint i = 0; i < feature_count; i += 8) {
+        __m256 ymm_n = _mm256_set_ps(n[fi[i + 7]], n[fi[i + 6]], n[fi[i + 5]], n[fi[i + 4]], n[fi[i + 3]], n[fi[i + 2]], n[fi[i + 1]], n[fi[i]]);
 
-        weights_z[feature_index] += feature_grad - sigma * feature_weights[i];
-        weights_n[feature_index] += feature_grad_sqr;
+        __m256 ymm_fg = _mm256_load_ps(fv + i) * ymm_grad;
+        __m256 ymm_fg_sqr = ymm_fg * ymm_fg;
+
+        __m256 ymm_sigma = (_mm256_sqrt_ps(ymm_n + ymm_fg_sqr) - _mm256_sqrt_ps(ymm_n)) / ymm_alpha;
+
+        __m256 ymm_za = ymm_fg - ymm_sigma * _mm256_load_ps(fw + i);
+
+        float * za = (float *)(&ymm_za);
+        float * gs = (float *)(&ymm_fg_sqr);
+
+        uint fl = min(8u, feature_count - i);
+
+        for (uint j = 0; j < fl; ++ j) {
+            weights_z[fi[i + j]] += za[j];
+            weights_n[fi[i + j]] += gs[j];
+        }
     }
 }

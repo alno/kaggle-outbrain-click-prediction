@@ -49,3 +49,15 @@ inline void zero_weights(T * weights, size_t n) {
 inline uint test_mask_bit(uint64_t * mask, uint i) {
     return (mask[i >> 6] >> (i & 63)) & 1;
 }
+
+
+template <typename T>
+inline T min(T a, T b) {
+    return a < b ? a : b;
+}
+
+
+template <typename T>
+inline int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
