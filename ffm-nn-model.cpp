@@ -79,9 +79,10 @@ static void init_interaction_weights(ffm_float * weights, ffm_uint n, D gen, std
 }
 
 
-ffm_nn_model::ffm_nn_model(int seed, bool restricted, float eta, float lambda) {
+ffm_nn_model::ffm_nn_model(int seed, bool restricted, float eta, float ffm_lambda, float nn_lambda) {
     this->eta = eta;
-    this->lambda = lambda;
+    this->ffm_lambda = ffm_lambda;
+    this->nn_lambda = nn_lambda;
 
     if (restricted) {
         max_b_field = 29;
@@ -233,14 +234,15 @@ void ffm_nn_model::update(const ffm_feature * start, const ffm_feature * end, fl
     fill_with_zero(l1_output_grad, l1_output_size);
 
     __m256 ymm_eta = _mm256_set1_ps(eta);
-    __m256 ymm_lambda = _mm256_set1_ps(lambda);
+    __m256 ymm_ffm_lambda = _mm256_set1_ps(ffm_lambda);
+    __m256 ymm_nn_lambda = _mm256_set1_ps(nn_lambda);
     __m256 ymm_grad = _mm256_set1_ps(kappa);
 
     // Backprop layer 2
     for (uint i = 0; i < l1_output_size; i += 8) {
         __m256 ymm_w = _mm256_load_ps(l2_w + i);
 
-        __m256 ymm_g = ymm_lambda * ymm_w + ymm_grad * _mm256_load_ps(l1_output + i);
+        __m256 ymm_g = ymm_nn_lambda * ymm_w + ymm_grad * _mm256_load_ps(l1_output + i);
         __m256 ymm_wg = _mm256_load_ps(l2_wg + i) + ymm_g * ymm_g;
 
         _mm256_store_ps(l1_output_grad + i, ymm_grad * ymm_w);
@@ -258,7 +260,7 @@ void ffm_nn_model::update(const ffm_feature * start, const ffm_feature * end, fl
 
             __m256 ymm_w = _mm256_load_ps(l1_w + ofs);
 
-            __m256 ymm_g = ymm_lambda * ymm_w + ymm_l1_grad * _mm256_load_ps(l0_output + i);
+            __m256 ymm_g = ymm_nn_lambda * ymm_w + ymm_l1_grad * _mm256_load_ps(l0_output + i);
             __m256 ymm_wg = _mm256_load_ps(l1_wg + ofs) + ymm_g * ymm_g;
 
             _mm256_store_ps(l0_output_grad + i, ymm_l1_grad * ymm_w + _mm256_load_ps(l0_output_grad + i));
@@ -275,7 +277,7 @@ void ffm_nn_model::update(const ffm_feature * start, const ffm_feature * end, fl
         uint field_a = fa->index >> ffm_hash_bits;
         float value_a = fa->value;
 
-        float g = lambda * lin_w[index_a] + l0_output_grad[1 + field_a] * value_a / linear_norm;
+        float g = ffm_lambda * lin_w[index_a] + l0_output_grad[1 + field_a] * value_a / linear_norm;
         float wg = lin_wg[index_a] + g*g;
 
         lin_w[index_a] -= eta * g / sqrt(wg);
@@ -323,8 +325,8 @@ void ffm_nn_model::update(const ffm_feature * start, const ffm_feature * end, fl
                 __m256 ymm_wgb = _mm256_load_ps(wgb + d);
 
                 // Compute gradient values
-                __m256 ymm_ga = _mm256_add_ps(_mm256_mul_ps(ymm_lambda, ymm_wa), _mm256_mul_ps(ymm_kappa_val, ymm_wb));
-                __m256 ymm_gb = _mm256_add_ps(_mm256_mul_ps(ymm_lambda, ymm_wb), _mm256_mul_ps(ymm_kappa_val, ymm_wa));
+                __m256 ymm_ga = _mm256_add_ps(ymm_ffm_lambda * ymm_wa, ymm_kappa_val * ymm_wb);
+                __m256 ymm_gb = _mm256_add_ps(ymm_ffm_lambda * ymm_wb, ymm_kappa_val * ymm_wa);
 
                 // Update weights
                 ymm_wga = _mm256_add_ps(ymm_wga, _mm256_mul_ps(ymm_ga, ymm_ga));
