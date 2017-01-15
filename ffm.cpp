@@ -1,6 +1,7 @@
 #include "ffm.h"
 
 #include "ffm-model.h"
+#include "ftrl-model.h"
 
 #include <iostream>
 #include <iomanip>
@@ -416,6 +417,13 @@ int main(int ac, char* av[]) {
 
         for (uint i = 0; i < opts.n_models; ++ i)
             models.push_back(new ffm_model(opts.seed + 100 + i * 17, opts.restricted));
+
+        apply(models, opts);
+    } else if (opts.model_name == "ftrl") {
+        std::vector<ftrl_model*> models;
+
+        for (uint i = 0; i < opts.n_models; ++ i)
+            models.push_back(new ftrl_model(24, 1.0, 2.0, 2e-4, 5e-4));
 
         apply(models, opts);
     } else {

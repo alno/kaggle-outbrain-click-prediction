@@ -16,7 +16,7 @@ bin/%: bin/%.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ -lboost_iostreams -lboost_program_options
 
 
-bin/ffm: bin/ffm-io.o bin/ffm-model.o
+bin/ffm: bin/ffm-io.o bin/ffm-model.o bin/ftrl-model.o
 bin/export-bin-data-p1: bin/ffm-io.o
 bin/export-bin-data-f1: bin/ffm-io.o
 bin/export-bin-data-f2: bin/ffm-io.o

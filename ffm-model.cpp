@@ -1,20 +1,11 @@
 #include "ffm-model.h"
+#include "util/model-helpers.h"
 
 #include <iostream>
 #include <iomanip>
 #include <fstream>
 #include <random>
 #include <algorithm>
-
-#include <immintrin.h>
-
-
-// Define intrinsic missing in gcc
-#define _mm256_set_m128(v0, v1)  _mm256_insertf128_ps(_mm256_castps128_ps256(v1), (v0), 1)
-
-
-constexpr ffm_uint align_bytes = 32;
-constexpr ffm_uint align_floats = align_bytes / sizeof(ffm_float);
 
 constexpr ffm_ulong n_fields = 40;
 constexpr ffm_ulong n_features = 1 << ffm_hash_bits;
@@ -28,39 +19,9 @@ constexpr ffm_ulong field_stride = n_dim_aligned * 2;
 constexpr uint prefetch_depth = 1;
 
 
-inline uint test_mask_bit(uint64_t * mask, uint i) {
-    return (mask[i >> 6] >> (i & 63)) & 1;
-}
-
-
 inline void prefetch_interaction_weights(float * addr) {
     for (uint i = 0, sz = field_stride * sizeof(float); i < sz; i += 64)
         _mm_prefetch(((char *)addr) + i, _MM_HINT_T1);
-}
-
-
-inline ffm_float sum(__m256 val) {
-    __m128 s = _mm256_extractf128_ps(_mm256_add_ps(val,  _mm256_permute2f128_ps(val, val, 1)), 0);
-
-    s = _mm_hadd_ps(s, s);
-    s = _mm_hadd_ps(s, s);
-
-    float sum;
-    _mm_store_ss(&sum, s);
-
-    return sum;
-}
-
-
-static ffm_float * malloc_aligned_float(ffm_ulong size) {
-    void *ptr;
-
-    int status = posix_memalign(&ptr, align_bytes, size*sizeof(ffm_float));
-
-    if(status != 0)
-        throw std::bad_alloc();
-
-    return (ffm_float*) ptr;
 }
 
 
@@ -107,8 +68,8 @@ ffm_model::ffm_model(int seed, bool restricted, float eta, float lambda) {
     bias_w = 0;
     bias_wg = 1;
 
-    weights = malloc_aligned_float(n_features * n_fields * n_dim_aligned * 2);
-    linear_weights = malloc_aligned_float(n_features * 2);
+    weights = malloc_aligned<float>(n_features * n_fields * n_dim_aligned * 2);
+    linear_weights = malloc_aligned<float>(n_features * 2);
 
     init_weights(weights, n_features * n_fields, std::uniform_real_distribution<ffm_float>(0.0, 1.0/sqrt(n_dim)), rnd);
     init_linear_weights(linear_weights, n_features);
