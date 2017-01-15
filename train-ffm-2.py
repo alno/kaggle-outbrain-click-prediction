@@ -4,8 +4,7 @@ import pandas as pd
 import os
 import argparse
 
-from util.meta import full_split, cv1_split, cv2_split
-from util import gen_prediction_name, gen_submission, score_prediction, print_and_exec
+from util import print_and_exec, train_model
 
 
 def fit_predict(profile, split, split_name):
@@ -17,7 +16,7 @@ def fit_predict(profile, split, split_name):
     pred = None
     for i in xrange(n_bags):
         opts = profile.get('options', '')
-        opts += " --seed %d --epochs %d" % (profile['seed'] + i * 3407, profile['epochs'])
+        opts += " --seed %d --epochs %d" % (profile.get('seed', np.random.randint(1e6)) + i * 3407, profile['epochs'])
 
         if split_name != "full":
             opts += " --val %s" % pred_file
@@ -49,6 +48,12 @@ profiles = {
         'dataset': "p1",
     },
 
+    'p1b': {
+        'epochs': 4,
+        'bags': 3,
+        'dataset': "p1",
+    },
+
     'f1': {
         'epochs': 4,
         'seed': 42,
@@ -56,9 +61,8 @@ profiles = {
     },
 
     'f1b': {
-        'bags': 3,
-        'epochs': 4,
-        'seed': 178,
+        'bags': 2,
+        'epochs': 5,
         'dataset': "f1",
     },
 
@@ -81,15 +85,24 @@ profiles = {
         'options': "--restricted",
         'dataset': "f2",
     },
+
+    'f3b': {
+        'bags': 2,
+        'epochs': 7,
+        'dataset': "f3",
+    },
 }
 
 
 parser = argparse.ArgumentParser(description='Train FFM2 model')
 parser.add_argument('profile', type=str, help='Train profile')
 parser.add_argument('--rewrite-cache', action='store_true', help='Drop cache files prior to train')
+parser.add_argument('--continue-train', type=str, help='Continue training of interrupted model')
 
 args = parser.parse_args()
-profile = profiles[args.profile]
+
+profile_name = args.profile
+profile = profiles[profile_name]
 
 
 if not os.path.exists('cache/full_train_bin_%s.index' % profile['dataset']) or args.rewrite_cache:
@@ -97,55 +110,4 @@ if not os.path.exists('cache/full_train_bin_%s.index' % profile['dataset']) or a
     os.system("bin/export-bin-data-%s" % profile['dataset'])
 
 
-## Validation on CV2
-
-print "CV2 split..."
-
-pred = fit_predict(profile, cv2_split, 'cv2')
-
-print "  Scoring..."
-
-cv2_present_score, cv2_future_score, cv2_score = score_prediction(pred)
-name = gen_prediction_name('ffm2-%s' % args.profile, cv2_score)
-
-print "  Present score: %.5f" % cv2_present_score
-print "  Future score: %.5f" % cv2_future_score
-print "  Total score: %.5f" % cv2_score
-
-pred[['pred']].to_csv('preds/%s-cv2.csv.gz' % name, index=False, compression='gzip')
-
-del pred
-
-## Validation on CV1
-
-print "CV1 split..."
-
-pred = fit_predict(profile, cv1_split, 'cv1')
-
-print "  Scoring..."
-
-cv1_present_score, cv1_future_score, cv1_score = score_prediction(pred)
-
-print "  Present score: %.5f" % cv1_present_score
-print "  Future score: %.5f" % cv1_future_score
-print "  Total score: %.5f" % cv1_score
-
-pred[['pred']].to_csv('preds/%s-cv1.csv.gz' % name, index=False, compression='gzip')
-
-del pred
-
-## Prediction
-
-print "Full split..."
-
-pred = fit_predict(profile, full_split, 'full')
-pred[['pred']].to_csv('preds/%s-test.csv.gz' % name, index=False, compression='gzip')
-
-print "  Generating submission..."
-subm = gen_submission(pred)
-subm.to_csv('subm/%s.csv.gz' % name, index=False, compression='gzip')
-
-del pred, subm
-
-print "  File name: %s" % name
-print "Done."
+train_model(fit_predict, profile_name, profile, name=args.continue_train)

@@ -6,7 +6,7 @@ import os
 
 from numba import jit
 
-from .meta import cv1_split_time
+from .meta import cv1_split_time, full_split, cv1_split, cv2_split
 
 
 def gen_prediction_name(model_name, score):
@@ -105,3 +105,67 @@ def score_sorted(y_true, y_pred, y_group):
             true_idx = i
 
     return score_sum / score_cnt
+
+
+def train_model(fit_predict, profile_name, profile, name=None):
+
+    ## Validation on CV2
+    if name is not None and os.path.exists('preds/%s-cv2.csv.gz' % name):
+        print "CV2 results already exist, skipping..."
+    else:
+        print "CV2 split..."
+
+        pred = fit_predict(profile, cv2_split, 'cv2')
+
+        print "  Scoring..."
+
+        cv2_present_score, cv2_future_score, cv2_score = score_prediction(pred)
+
+        if name is None:
+            name = gen_prediction_name('ffm2-%s' % profile_name, cv2_score)
+
+        print "  Present score: %.5f" % cv2_present_score
+        print "  Future score: %.5f" % cv2_future_score
+        print "  Total score: %.5f" % cv2_score
+
+        pred[['pred']].to_csv('preds/%s-cv2.csv.gz' % name, index=False, compression='gzip')
+
+        del pred
+
+    ## Validation on CV1
+    if os.path.exists('preds/%s-cv1.csv.gz' % name):
+        print "CV1 results already exist, skipping..."
+    else:
+        print "CV1 split..."
+
+        pred = fit_predict(profile, cv1_split, 'cv1')
+
+        print "  Scoring..."
+
+        cv1_present_score, cv1_future_score, cv1_score = score_prediction(pred)
+
+        print "  Present score: %.5f" % cv1_present_score
+        print "  Future score: %.5f" % cv1_future_score
+        print "  Total score: %.5f" % cv1_score
+
+        pred[['pred']].to_csv('preds/%s-cv1.csv.gz' % name, index=False, compression='gzip')
+
+        del pred
+
+    ## Prediction
+    if os.path.exists('preds/%s-cv1.csv.gz' % name):
+        print "Full results already exist, skipping..."
+    else:
+        print "Full split..."
+
+        pred = fit_predict(profile, full_split, 'full')
+        pred[['pred']].to_csv('preds/%s-test.csv.gz' % name, index=False, compression='gzip')
+
+        print "  Generating submission..."
+        subm = gen_submission(pred)
+        subm.to_csv('subm/%s.csv.gz' % name, index=False, compression='gzip')
+
+        del pred, subm
+
+        print "  File name: %s" % name
+        print "Done."
