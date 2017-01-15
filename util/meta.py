@@ -13,3 +13,12 @@ cv2_split = (os.path.join(cache_dir, 'clicks_cv2_train.csv.gz'), os.path.join(ca
 
 cv1_split_time = 950400000
 test_split_time = 1123200000
+
+row_counts = {
+    'cv2_train': 14164401,
+    'cv2_test': 6484938,
+    'cv1_train': 62252998,
+    'cv1_test': 24888733,
+    'full_train': 87141731,
+    'full_test': 32225162
+}
