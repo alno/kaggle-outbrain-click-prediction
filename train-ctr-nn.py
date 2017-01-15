@@ -13,7 +13,7 @@ from keras.layers.normalization import BatchNormalization
 from keras import regularizers
 
 
-input_size = 18
+input_size = 19
 
 
 def regularizer(params):
@@ -86,4 +86,4 @@ def fit_predict(profile, split, split_name):
 profile_name = 'v1'
 profile = {}
 
-train_model(fit_predict, profile_name, profile)
+train_model(fit_predict, 'ctr-nn-%s' % profile_name, profile)

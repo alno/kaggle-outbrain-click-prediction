@@ -110,4 +110,4 @@ if not os.path.exists('cache/full_train_bin_%s.index' % profile['dataset']) or a
     os.system("bin/export-bin-data-%s" % profile['dataset'])
 
 
-train_model(fit_predict, profile_name, profile, name=args.continue_train)
+train_model(fit_predict, 'ffm2-%s' % profile_name, profile, name=args.continue_train)
