@@ -107,7 +107,7 @@ def score_sorted(y_true, y_pred, y_group):
     return score_sum / score_cnt
 
 
-def train_model(fit_predict, profile_name, profile, name=None):
+def train_model(fit_predict, model_name, profile, name=None):
 
     ## Validation on CV2
     if name is not None and os.path.exists('preds/%s-cv2.csv.gz' % name):
@@ -122,7 +122,7 @@ def train_model(fit_predict, profile_name, profile, name=None):
         cv2_present_score, cv2_future_score, cv2_score = score_prediction(pred)
 
         if name is None:
-            name = gen_prediction_name('ffm2-%s' % profile_name, cv2_score)
+            name = gen_prediction_name(model_name, cv2_score)
 
         print "  Present score: %.5f" % cv2_present_score
         print "  Future score: %.5f" % cv2_future_score

@@ -220,7 +220,7 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
     features.raw(18, stoi(rows[9][0]) + 180); // Rival count
 
     // Rival ids
-    auto rival_ids = split(rows[10][1], ' ');
+    auto rival_ids = split(rows[9][1], ' ');
     for (uint ri = 0; ri < rival_ids.size(); ++ ri) {
         auto rival_id = stoi(rival_ids[ri]);
 
