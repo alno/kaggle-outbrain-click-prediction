@@ -22,7 +22,7 @@ constexpr uint prefetch_depth = 1;
 constexpr uint interaction_output_size = 50;
 
 constexpr uint l0_output_size = aligned_float_array_size(1 + n_fields + interaction_output_size);
-constexpr uint l1_output_size = aligned_float_array_size(2);
+constexpr uint l1_output_size = aligned_float_array_size(24);
 
 constexpr uint l1_layer_size = l0_output_size * (l1_output_size - 1);
 constexpr uint l2_layer_size = l1_output_size;
@@ -150,7 +150,7 @@ float ffm_nn_model::predict(const ffm_feature * start, const ffm_feature * end, 
     l0_output[0] = 1.0; // Layer 1 bias
     l1_output[0] = 1.0; // Layer 2 bias
 
-    uint i = 0;
+    uint dropout_idx = 0;
     for (const ffm_feature * fa = start; fa != end; ++ fa) {
         uint index_a = fa->index &  ffm_hash_mask;
         uint field_a = fa->index >> ffm_hash_bits;
@@ -161,7 +161,7 @@ float ffm_nn_model::predict(const ffm_feature * start, const ffm_feature * end, 
         if (field_a < min_a_field)
             continue;
 
-        for (const ffm_feature * fb = start; fb != fa; ++ fb, ++ i) {
+        for (const ffm_feature * fb = start; fb != fa; ++ fb) {
             uint index_b = fb->index &  ffm_hash_mask;
             uint field_b = fb->index >> ffm_hash_bits;
             float value_b = fb->value;
@@ -169,7 +169,7 @@ float ffm_nn_model::predict(const ffm_feature * start, const ffm_feature * end, 
             if (field_b > max_b_field)
                 break;
 
-            if (fb + prefetch_depth < fa && test_mask_bit(dropout_mask, i + prefetch_depth)) { // Prefetch row only if no dropout
+            if (fb + prefetch_depth < fa && test_mask_bit(dropout_mask, dropout_idx + prefetch_depth)) { // Prefetch row only if no dropout
                 uint index_p = fb[prefetch_depth].index &  ffm_hash_mask;
                 uint field_p = fb[prefetch_depth].index >> ffm_hash_bits;
 
@@ -177,7 +177,7 @@ float ffm_nn_model::predict(const ffm_feature * start, const ffm_feature * end, 
                 prefetch_interaction_weights(ffm_weights + index_a * index_stride + field_p * field_stride);
             }
 
-            if (test_mask_bit(dropout_mask, i) == 0)
+            if (test_mask_bit(dropout_mask, dropout_idx ++) == 0)
                 continue;
 
             //if (field_a == field_b)
@@ -240,7 +240,7 @@ void ffm_nn_model::update(const ffm_feature * start, const ffm_feature * end, fl
     for (uint i = 0; i < l1_output_size; i += 8) {
         __m256 ymm_w = _mm256_load_ps(l2_w + i);
 
-        __m256 ymm_g = /*ymm_lambda * ymm_w +*/ ymm_grad * _mm256_load_ps(l1_output + i);
+        __m256 ymm_g = ymm_lambda * ymm_w + ymm_grad * _mm256_load_ps(l1_output + i);
         __m256 ymm_wg = _mm256_load_ps(l2_wg + i) + ymm_g * ymm_g;
 
         _mm256_store_ps(l1_output_grad + i, ymm_grad * ymm_w);
@@ -258,7 +258,7 @@ void ffm_nn_model::update(const ffm_feature * start, const ffm_feature * end, fl
 
             __m256 ymm_w = _mm256_load_ps(l1_w + ofs);
 
-            __m256 ymm_g = /*ymm_lambda * ymm_w +*/ ymm_l1_grad * _mm256_load_ps(l0_output + i);
+            __m256 ymm_g = ymm_lambda * ymm_w + ymm_l1_grad * _mm256_load_ps(l0_output + i);
             __m256 ymm_wg = _mm256_load_ps(l1_wg + ofs) + ymm_g * ymm_g;
 
             _mm256_store_ps(l0_output_grad + i, ymm_l1_grad * ymm_w + _mm256_load_ps(l0_output_grad + i));
@@ -269,7 +269,7 @@ void ffm_nn_model::update(const ffm_feature * start, const ffm_feature * end, fl
     }
 
     // Update linear and interaction weights
-    uint i = 0;
+    uint dropout_idx = 0;
     for (const ffm_feature * fa = start; fa != end; ++ fa) {
         uint index_a = fa->index &  ffm_hash_mask;
         uint field_a = fa->index >> ffm_hash_bits;
@@ -284,7 +284,7 @@ void ffm_nn_model::update(const ffm_feature * start, const ffm_feature * end, fl
         if (field_a < min_a_field)
             continue;
 
-        for (const ffm_feature * fb = start; fb != fa; ++ fb, ++ i) {
+        for (const ffm_feature * fb = start; fb != fa; ++ fb) {
             uint index_b = fb->index &  ffm_hash_mask;
             uint field_b = fb->index >> ffm_hash_bits;
             float value_b = fb->value;
@@ -292,7 +292,7 @@ void ffm_nn_model::update(const ffm_feature * start, const ffm_feature * end, fl
             if (field_b > max_b_field)
                 break;
 
-            if (fb + prefetch_depth < fa && test_mask_bit(dropout_mask, i + prefetch_depth)) { // Prefetch row only if no dropout
+            if (fb + prefetch_depth < fa && test_mask_bit(dropout_mask, dropout_idx + prefetch_depth)) { // Prefetch row only if no dropout
                 uint index_p = fb[prefetch_depth].index &  ffm_hash_mask;
                 uint field_p = fb[prefetch_depth].index >> ffm_hash_bits;
 
@@ -300,7 +300,7 @@ void ffm_nn_model::update(const ffm_feature * start, const ffm_feature * end, fl
                 prefetch_interaction_weights(ffm_weights + index_a * index_stride + field_p * field_stride);
             }
 
-            if (test_mask_bit(dropout_mask, i) == 0)
+            if (test_mask_bit(dropout_mask, dropout_idx ++) == 0)
                 continue;
 
             //if (field_a == field_b)

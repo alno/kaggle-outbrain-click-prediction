@@ -22,8 +22,7 @@ const ffm_uint mini_batch_size = 24;
 
 // Dropout configuration
 const ffm_uint dropout_mask_max_size = 1000; // in 64-bit words
-const ffm_uint dropout_prob_log = 1; // 0.5 dropout rate
-const ffm_float dropout_mult = (1 << dropout_prob_log) / ((1 << dropout_prob_log) - 1.0f);
+
 
 std::default_random_engine rnd(2017);
 
@@ -130,7 +129,9 @@ ffm_double compute_map(const ffm_index & index, const std::vector<ffm_float> & p
 
 
 template <typename M>
-ffm_double train_on_dataset(const std::vector<M*> & models, const ffm_dataset & dataset) {
+ffm_double train_on_dataset(const std::vector<M*> & models, const ffm_dataset & dataset, uint dropout_prob_log) {
+    float dropout_mult = (1 << dropout_prob_log) / ((1 << dropout_prob_log) - 1.0f);
+
     time_t start_time = time(nullptr);
 
     std::cout << "  Training... ";
@@ -339,6 +340,8 @@ public:
     uint seed;
 
     bool restricted;
+
+    uint dropout_prob_log;
 public:
     program_options(int ac, char* av[]): desc("Allowed options"), model_name("ffm"), n_epochs(10), n_threads(4), n_models(1), seed(2017) {
         using namespace boost::program_options;
@@ -354,6 +357,7 @@ public:
             ("threads", value<uint>(&n_threads), "number of threads (default 4)")
             ("average", value<uint>(&n_models), "number of models to average (default 1)")
             ("seed", value<uint>(&seed), "random seed")
+            ("dropout-log", value<uint>(&dropout_prob_log), "dropout probability (binary log)")
             ("restricted", "restrict feature interactions to (E+C) * (C+A)")
         ;
 
@@ -382,7 +386,7 @@ void apply(const std::vector<M*> & models, program_options & opts) {
         for (ffm_uint epoch = 0; epoch < opts.n_epochs; ++ epoch) {
             cout << "Epoch " << epoch << "..." << endl;
 
-            train_on_dataset(models, ds_train);
+            train_on_dataset(models, ds_train, opts.dropout_prob_log);
         }
     } else { // Train with validation each epoch
         auto ds_train = open_dataset(opts.train_file_name);
@@ -391,7 +395,7 @@ void apply(const std::vector<M*> & models, program_options & opts) {
         for (ffm_uint epoch = 0; epoch < opts.n_epochs; ++ epoch) {
             cout << "Epoch " << epoch << "..." << endl;
 
-            train_on_dataset(models, ds_train);
+            train_on_dataset(models, ds_train, opts.dropout_prob_log);
             evaluate_on_dataset(models, ds_val);
         }
     }
