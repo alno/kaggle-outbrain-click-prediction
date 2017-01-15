@@ -74,7 +74,7 @@ ftrl_model::~ftrl_model() {
 
 
 
-float ftrl_model::predict(const ffm_feature * start, const ffm_feature * end, ffm_float norm, uint64_t * dropout_mask) {
+float ftrl_model::predict(const ffm_feature * start, const ffm_feature * end, ffm_float norm, uint64_t * dropout_mask, float dropout_mult) {
     auto & feature_buf = local_feature_buffer;
 
     feature_buf.clear();
@@ -126,7 +126,7 @@ float ftrl_model::predict(const ffm_feature * start, const ffm_feature * end, ff
 }
 
 
-void ftrl_model::update(const ffm_feature * start, const ffm_feature * end, ffm_float norm, ffm_float grad, uint64_t * dropout_mask) {
+void ftrl_model::update(const ffm_feature * start, const ffm_feature * end, ffm_float norm, ffm_float grad, uint64_t * dropout_mask, float dropout_mult) {
     auto & feature_buf = local_feature_buffer;
 
     uint feature_count = feature_buf.size;

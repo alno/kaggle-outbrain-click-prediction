@@ -21,9 +21,9 @@ const ffm_uint batch_size = 20000;
 const ffm_uint mini_batch_size = 24;
 
 // Dropout configuration
-const ffm_uint dropout_mask_size = 1000; // in 64-bit words
+const ffm_uint dropout_mask_max_size = 1000; // in 64-bit words
 const ffm_uint dropout_prob_log = 1; // 0.5 dropout rate
-const ffm_float dropout_norm_mult = ((1 << dropout_prob_log) - 1.0f) / (1 << dropout_prob_log);
+const ffm_float dropout_mult = (1 << dropout_prob_log) / ((1 << dropout_prob_log) - 1.0f);
 
 std::default_random_engine rnd(2017);
 
@@ -155,7 +155,7 @@ ffm_double train_on_dataset(const std::vector<M*> & models, const ffm_dataset & 
         std::vector<ffm_feature> batch_features = ffm_read_batch(dataset.data_file_name, batch_start_offset, batch_end_offset);
         ffm_feature * batch_features_data = batch_features.data();
 
-        uint64_t mask[dropout_mask_size];
+        uint64_t dropout_mask[dropout_mask_max_size];
 
         std::vector<float> ts(batch_end_index - batch_start_index);
         std::vector<uint> tc(batch_end_index - batch_start_index);
@@ -167,20 +167,19 @@ ffm_double train_on_dataset(const std::vector<M*> & models, const ffm_dataset & 
             for (auto mb = mini_batches.begin(); mb != mini_batches.end(); ++ mb) {
                 for (auto ei = mb->first; ei < mb->second; ++ ei) {
                     ffm_float y = dataset.index.labels[ei];
-                    ffm_float norm = dataset.index.norms[ei] * dropout_norm_mult;
+                    ffm_float norm = dataset.index.norms[ei];
 
                     auto start_offset = dataset.index.offsets[ei] - batch_start_offset;
                     auto end_offset = dataset.index.offsets[ei+1] - batch_start_offset;
 
-                    auto feature_count = end_offset - start_offset;
-                    auto interaction_count = feature_count * (feature_count + 1) / 2;
+                    auto dropout_mask_size = models[mi]->get_dropout_mask_size(batch_features_data + start_offset, batch_features_data + end_offset);
 
-                    fill_mask_rand(mask, (interaction_count + 63) / 64, dropout_prob_log);
+                    fill_mask_rand(dropout_mask, (dropout_mask_size + 63) / 64, dropout_prob_log);
 
-                    float t = models[mi]->predict(batch_features_data + start_offset, batch_features_data + end_offset, norm, mask);
+                    float t = models[mi]->predict(batch_features_data + start_offset, batch_features_data + end_offset, norm, dropout_mask, dropout_mult);
                     float expnyt = exp(-y*t);
 
-                    models[mi]->update(batch_features_data + start_offset, batch_features_data + end_offset, norm, -y * expnyt / (1+expnyt), mask);
+                    models[mi]->update(batch_features_data + start_offset, batch_features_data + end_offset, norm, -y * expnyt / (1+expnyt), dropout_mask, dropout_mult);
 
                     uint i = ei - batch_start_index;
                     ts[i] += t;
@@ -210,8 +209,8 @@ ffm_double evaluate_on_dataset(const std::vector<M*> & models, const ffm_dataset
 
     auto batches = generate_batches(dataset.index, false);
 
-    uint64_t mask[dropout_mask_size];
-    fill_mask_ones(mask, dropout_mask_size);
+    uint64_t dropout_mask[dropout_mask_max_size];
+    fill_mask_ones(dropout_mask, dropout_mask_max_size);
 
     ffm_double loss = 0.0;
     ffm_uint cnt = 0;
@@ -241,7 +240,7 @@ ffm_double evaluate_on_dataset(const std::vector<M*> & models, const ffm_dataset
             uint tc = 0;
 
             for (uint mi = 0; mi < models.size(); ++ mi) {
-                ts += models[mi]->predict(batch_features_data + start_offset, batch_features_data + end_offset, norm, mask);
+                ts += models[mi]->predict(batch_features_data + start_offset, batch_features_data + end_offset, norm, dropout_mask, 1);
                 tc ++;
             }
 
@@ -269,8 +268,8 @@ void predict_on_dataset(const std::vector<M*> & models, const ffm_dataset & data
 
     auto batches = generate_batches(dataset.index, false);
 
-    uint64_t mask[dropout_mask_size];
-    fill_mask_ones(mask, dropout_mask_size);
+    uint64_t dropout_mask[dropout_mask_max_size];
+    fill_mask_ones(dropout_mask, dropout_mask_max_size);
 
     ffm_ulong cnt = 0;
 
@@ -295,7 +294,7 @@ void predict_on_dataset(const std::vector<M*> & models, const ffm_dataset & data
             uint tc = 0;
 
             for (uint mi = 0; mi < models.size(); ++ mi) {
-                ts += models[mi]->predict(batch_features_data + start_offset, batch_features_data + end_offset, norm, mask);
+                ts += models[mi]->predict(batch_features_data + start_offset, batch_features_data + end_offset, norm, dropout_mask, 1);
                 tc ++;
             }
 

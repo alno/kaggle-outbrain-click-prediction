@@ -131,7 +131,15 @@ ffm_nn_model::~ffm_nn_model() {
 }
 
 
-float ffm_nn_model::predict(const ffm_feature * start, const ffm_feature * end, float norm, uint64_t * mask) {
+uint ffm_nn_model::get_dropout_mask_size(const ffm_feature * start, const ffm_feature * end) {
+    uint feature_count = end - start;
+    uint interaction_count = feature_count * (feature_count + 1) / 2;
+
+    return interaction_count;
+}
+
+
+float ffm_nn_model::predict(const ffm_feature * start, const ffm_feature * end, float norm, uint64_t * dropout_mask, float dropout_mult) {
     float linear_norm = end - start;
     float * l0_output = local_state_buffer.l0_output;
     float * l1_output = local_state_buffer.l1_output;
@@ -161,7 +169,7 @@ float ffm_nn_model::predict(const ffm_feature * start, const ffm_feature * end, 
             if (field_b > max_b_field)
                 break;
 
-            if (fb + prefetch_depth < fa && test_mask_bit(mask, i + prefetch_depth)) { // Prefetch row only if no dropout
+            if (fb + prefetch_depth < fa && test_mask_bit(dropout_mask, i + prefetch_depth)) { // Prefetch row only if no dropout
                 uint index_p = fb[prefetch_depth].index &  ffm_hash_mask;
                 uint field_p = fb[prefetch_depth].index >> ffm_hash_bits;
 
@@ -169,7 +177,7 @@ float ffm_nn_model::predict(const ffm_feature * start, const ffm_feature * end, 
                 prefetch_interaction_weights(ffm_weights + index_a * index_stride + field_p * field_stride);
             }
 
-            if (test_mask_bit(mask, i) == 0)
+            if (test_mask_bit(dropout_mask, i) == 0)
                 continue;
 
             //if (field_a == field_b)
@@ -179,7 +187,7 @@ float ffm_nn_model::predict(const ffm_feature * start, const ffm_feature * end, 
             ffm_float * wb = ffm_weights + index_b * index_stride + field_a * field_stride;
 
             __m256 ymm_total = _mm256_set1_ps(0);
-            __m256 ymm_val = _mm256_set1_ps(value_a * value_b / norm);
+            __m256 ymm_val = _mm256_set1_ps(dropout_mult * value_a * value_b / norm);
 
             for(ffm_uint d = 0; d < n_dim; d += 8) {
                 __m256 ymm_wa = _mm256_load_ps(wa + d);
@@ -212,7 +220,7 @@ float ffm_nn_model::predict(const ffm_feature * start, const ffm_feature * end, 
 }
 
 
-void ffm_nn_model::update(const ffm_feature * start, const ffm_feature * end, float norm, float kappa, uint64_t * mask) {
+void ffm_nn_model::update(const ffm_feature * start, const ffm_feature * end, float norm, float kappa, uint64_t * dropout_mask, float dropout_mult) {
     float linear_norm = end - start;
 
     float * l0_output = local_state_buffer.l0_output;
@@ -284,7 +292,7 @@ void ffm_nn_model::update(const ffm_feature * start, const ffm_feature * end, fl
             if (field_b > max_b_field)
                 break;
 
-            if (fb + prefetch_depth < fa && test_mask_bit(mask, i + prefetch_depth)) { // Prefetch row only if no dropout
+            if (fb + prefetch_depth < fa && test_mask_bit(dropout_mask, i + prefetch_depth)) { // Prefetch row only if no dropout
                 uint index_p = fb[prefetch_depth].index &  ffm_hash_mask;
                 uint field_p = fb[prefetch_depth].index >> ffm_hash_bits;
 
@@ -292,7 +300,7 @@ void ffm_nn_model::update(const ffm_feature * start, const ffm_feature * end, fl
                 prefetch_interaction_weights(ffm_weights + index_a * index_stride + field_p * field_stride);
             }
 
-            if (test_mask_bit(mask, i) == 0)
+            if (test_mask_bit(dropout_mask, i) == 0)
                 continue;
 
             //if (field_a == field_b)
@@ -304,7 +312,7 @@ void ffm_nn_model::update(const ffm_feature * start, const ffm_feature * end, fl
             float * wga = wa + n_dim_aligned;
             float * wgb = wb + n_dim_aligned;
 
-            __m256 ymm_kappa_val = _mm256_set1_ps(l0_output_grad[1 + n_fields + (field_a * 2654435761 + field_b) % interaction_output_size] * value_a * value_b / norm);
+            __m256 ymm_kappa_val = _mm256_set1_ps(l0_output_grad[1 + n_fields + (field_a * 2654435761 + field_b) % interaction_output_size] * dropout_mult * value_a * value_b / norm);
 
             for(ffm_uint d = 0; d < n_dim; d += 8) {
                 // Load weights

@@ -71,6 +71,7 @@ nn_model::nn_model(int seed, float eta, float lambda) {
     fill_with_ones(l2_wg, l2_layer_size);
 }
 
+
 nn_model::~nn_model() {
     free(lin_w);
     free(lin_wg);
@@ -82,10 +83,18 @@ nn_model::~nn_model() {
     free(l2_wg);
 }
 
-float nn_model::predict(const ffm_feature * start, const ffm_feature * end, float norm, uint64_t * dropout_mask) {
+
+uint nn_model::get_dropout_mask_size(const ffm_feature * start, const ffm_feature * end) {
+    return 0;
+}
+
+
+float nn_model::predict(const ffm_feature * start, const ffm_feature * end, float norm, uint64_t * dropout_mask, float dropout_mult) {
     float linear_norm = end - start;
     float * l0_output = local_state_buffer.l0_output;
     float * l1_output = local_state_buffer.l1_output;
+
+    uint dropout_idx = 0;
 
     fill_with_zero(l0_output, l0_output_size);
     fill_with_zero(l1_output, l1_output_size);
@@ -93,7 +102,6 @@ float nn_model::predict(const ffm_feature * start, const ffm_feature * end, floa
     l0_output[0] = 1.0; // Layer 1 bias
     l1_output[0] = 1.0; // Layer 2 bias
 
-    uint i = 0;
     for (const ffm_feature * fa = start; fa != end; ++ fa) {
         uint index_a = fa->index &  ffm_hash_mask;
         uint field_a = fa->index >> ffm_hash_bits;
@@ -106,13 +114,16 @@ float nn_model::predict(const ffm_feature * start, const ffm_feature * end, floa
     float total = l2_w[0];
 
     for (uint j = 1; j < l1_output_size; ++ j) {
+        //if (test_mask_bit(dropout_mask, dropout_idx ++) == 0)
+        //    continue;
+
         __m256 ymm_total = _mm256_set1_ps(0);
 
         for (uint i = 0; i < l0_output_size; i += 8) {
             ymm_total += _mm256_load_ps(l0_output + i) * _mm256_load_ps(l1_w + (j - 1) * l0_output_size + i);
         }
 
-        float l1_out = relu(sum(ymm_total));
+        float l1_out = relu(sum(ymm_total));// * dropout_mult;
 
         l1_output[j] = l1_out;
         total += l1_out * l2_w[j];
@@ -122,7 +133,7 @@ float nn_model::predict(const ffm_feature * start, const ffm_feature * end, floa
     return total;
 }
 
-void nn_model::update(const ffm_feature * start, const ffm_feature * end, float norm, float kappa, uint64_t * dropout_mask) {
+void nn_model::update(const ffm_feature * start, const ffm_feature * end, float norm, float kappa, uint64_t * dropout_mask, float dropout_mult) {
     float linear_norm = end - start;
 
     float * l0_output = local_state_buffer.l0_output;

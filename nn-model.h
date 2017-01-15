@@ -21,6 +21,8 @@ public:
     nn_model(int seed, float eta = 0.2, float lambda = 0.00002);
     ~nn_model();
 
-    float predict(const ffm_feature * start, const ffm_feature * end, float norm, uint64_t * dropout_mask);
-    void update(const ffm_feature * start, const ffm_feature * end, float norm, float kappa, uint64_t * dropout_mask);
+    float predict(const ffm_feature * start, const ffm_feature * end, float norm, uint64_t * dropout_mask, float dropout_mult);
+    void update(const ffm_feature * start, const ffm_feature * end, float norm, float kappa, uint64_t * dropout_mask, float dropout_mult);
+
+    uint get_dropout_mask_size(const ffm_feature * start, const ffm_feature * end);
 };

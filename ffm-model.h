@@ -18,6 +18,8 @@ public:
     ffm_model(int seed, bool restricted, float eta = 0.2, float lambda = 0.00002);
     ~ffm_model();
 
-    float predict(const ffm_feature * start, const ffm_feature * end, float norm, uint64_t * mask);
-    void update(const ffm_feature * start, const ffm_feature * end, float norm, float kappa, uint64_t * mask);
+    float predict(const ffm_feature * start, const ffm_feature * end, float norm, uint64_t * dropout_mask, float dropout_mult);
+    void update(const ffm_feature * start, const ffm_feature * end, float norm, float kappa, uint64_t * dropout_mask, float dropout_mult);
+
+    uint get_dropout_mask_size(const ffm_feature * start, const ffm_feature * end);
 };
