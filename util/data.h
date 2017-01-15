@@ -135,6 +135,13 @@ std::pair<uint, std::vector<uint>> read_doc_ad_others(const std::vector<std::str
 }
 
 
+std::pair<uint, std::vector<uint>> read_viewed_doc_trf_source(const std::vector<std::string> & row) {
+    using namespace std;
+
+    return make_pair(stoi(row[0]), parse_id_list(row[1]));
+}
+
+
 std::vector<event> read_events() {
     return read_vector("cache/events.csv.gz", read_event, 23120127);
 }
@@ -158,6 +165,7 @@ struct reference_data {
 
     std::unordered_map<std::pair<uint, uint>, std::vector<uint>> viewed_docs_one_hour_after;
     std::unordered_map<uint, std::vector<uint>> doc_ad_others;
+    std::unordered_map<uint, std::vector<uint>> viewed_doc_trf_source;
 };
 
 reference_data load_reference_data() {
@@ -170,6 +178,7 @@ reference_data load_reference_data() {
     res.document_entities = read_multi_map("cache/documents_entities.csv.gz", read_document_annotation);
     res.viewed_docs_one_hour_after = read_map("cache/viewed_docs_one_hour_after.csv.gz", read_viewed_doc_one_hour_after);
     res.doc_ad_others = read_map("cache/doc_ad_others.csv.gz", read_doc_ad_others);
+    res.viewed_doc_trf_source = read_map("cache/viewed_doc_trf_source.csv.gz", read_viewed_doc_trf_source);
 
     return res;
 }

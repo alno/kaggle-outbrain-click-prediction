@@ -219,6 +219,23 @@ void writer::write(const reference_data & data, const std::vector<std::vector<st
 
     features.raw(18, stoi(rows[9][0]) + 180); // Rival count
 
+    // Rival ids
+    auto rival_ids = split(rows[10][1], ' ');
+    for (uint ri = 0; ri < rival_ids.size(); ++ ri) {
+        auto rival_id = stoi(rival_ids[ri]);
+
+        if (rival_id != ad_id)
+            features.hashed(20, rival_id);
+    }
+
+    auto doc_ad_others_it = data.doc_ad_others.find(event_id);
+    if (doc_ad_others_it != data.doc_ad_others.end()) {
+        auto ids = doc_ad_others_it->second;
+
+        for (uint i = 0; i < ids.size(); ++ i)
+            features.hashed(21, ids[i]);
+    }
+
     // Similarity features
     /*
     for (uint i = 0; i < rows[2].size(); ++ i)
