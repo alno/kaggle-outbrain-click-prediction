@@ -1,5 +1,7 @@
 #pragma once
 
+#include <random>
+
 #include <immintrin.h>
 
 // Define intrinsic missing in gcc
@@ -38,11 +40,30 @@ inline T * malloc_aligned(size_t size) {
 
 
 template <typename T>
-inline void zero_weights(T * weights, size_t n) {
+inline void fill_with_zero(T * weights, size_t n) {
     T * w = weights;
 
     for(size_t i = 0; i < n; i++)
         *w++ = T(0);
+}
+
+
+template <typename D>
+static void fill_with_rand(ffm_float * weights, ffm_uint n, D gen, std::default_random_engine & rnd) {
+    ffm_float * w = weights;
+
+    for(ffm_uint i = 0; i < n; i++) {
+        *w++ = 1.0;//gen(rnd);
+    }
+}
+
+
+template <typename T>
+inline void fill_with_ones(T * weights, size_t n) {
+    T * w = weights;
+
+    for(size_t i = 0; i < n; i++)
+        *w++ = T(1);
 }
 
 

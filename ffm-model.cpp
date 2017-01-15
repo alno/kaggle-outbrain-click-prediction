@@ -4,7 +4,6 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
-#include <random>
 #include <algorithm>
 
 constexpr ffm_ulong n_fields = 40;
@@ -26,7 +25,7 @@ inline void prefetch_interaction_weights(float * addr) {
 
 
 template <typename D>
-static void init_weights(ffm_float * weights, ffm_uint n, D gen, std::default_random_engine & rnd) {
+static void init_ffm_weights(ffm_float * weights, ffm_uint n, D gen, std::default_random_engine & rnd) {
     ffm_float * w = weights;
 
     for(ffm_uint i = 0; i < n; i++) {
@@ -42,7 +41,7 @@ static void init_weights(ffm_float * weights, ffm_uint n, D gen, std::default_ra
 }
 
 
-static void init_linear_weights(ffm_float * weights, ffm_uint n) {
+static void init_lin_weights(ffm_float * weights, ffm_uint n) {
     ffm_float * w = weights;
 
     for(ffm_uint i = 0; i < n; i++) {
@@ -68,23 +67,23 @@ ffm_model::ffm_model(int seed, bool restricted, float eta, float lambda) {
     bias_w = 0;
     bias_wg = 1;
 
-    weights = malloc_aligned<float>(n_features * n_fields * n_dim_aligned * 2);
-    linear_weights = malloc_aligned<float>(n_features * 2);
+    ffm_weights = malloc_aligned<float>(n_features * n_fields * n_dim_aligned * 2);
+    lin_weights = malloc_aligned<float>(n_features * 2);
 
-    init_weights(weights, n_features * n_fields, std::uniform_real_distribution<ffm_float>(0.0, 1.0/sqrt(n_dim)), rnd);
-    init_linear_weights(linear_weights, n_features);
+    init_ffm_weights(ffm_weights, n_features * n_fields, std::uniform_real_distribution<ffm_float>(0.0, 1.0/sqrt(n_dim)), rnd);
+    init_lin_weights(lin_weights, n_features);
 }
 
 ffm_model::~ffm_model() {
-    free(weights);
-    free(linear_weights);
+    free(ffm_weights);
+    free(lin_weights);
 }
 
 ffm_float ffm_model::predict(const ffm_feature * start, const ffm_feature * end, ffm_float norm, uint64_t * mask) {
-    ffm_float linear_total = 0;
+    ffm_float linear_total = bias_w;
     ffm_float linear_norm = end - start;
 
-    __m256 xmm_total = _mm256_set1_ps(bias_w);
+    __m256 xmm_total = _mm256_set1_ps(0);
 
     ffm_uint i = 0;
 
@@ -93,7 +92,7 @@ ffm_float ffm_model::predict(const ffm_feature * start, const ffm_feature * end,
         ffm_uint field_a = fa->index >> ffm_hash_bits;
         ffm_float value_a = fa->value;
 
-        linear_total += value_a * linear_weights[index_a*2] / linear_norm;
+        linear_total += value_a * lin_weights[index_a*2] / linear_norm;
 
         if (field_a < min_a_field)
             continue;
@@ -110,8 +109,8 @@ ffm_float ffm_model::predict(const ffm_feature * start, const ffm_feature * end,
                 ffm_uint index_p = fb[prefetch_depth].index &  ffm_hash_mask;
                 ffm_uint field_p = fb[prefetch_depth].index >> ffm_hash_bits;
 
-                prefetch_interaction_weights(weights + index_p * index_stride + field_a * field_stride);
-                prefetch_interaction_weights(weights + index_a * index_stride + field_p * field_stride);
+                prefetch_interaction_weights(ffm_weights + index_p * index_stride + field_a * field_stride);
+                prefetch_interaction_weights(ffm_weights + index_a * index_stride + field_p * field_stride);
             }
 
             if (test_mask_bit(mask, i) == 0)
@@ -120,8 +119,8 @@ ffm_float ffm_model::predict(const ffm_feature * start, const ffm_feature * end,
             //if (field_a == field_b)
             //    continue;
 
-            ffm_float * wa = weights + index_a * index_stride + field_b * field_stride;
-            ffm_float * wb = weights + index_b * index_stride + field_a * field_stride;
+            ffm_float * wa = ffm_weights + index_a * index_stride + field_b * field_stride;
+            ffm_float * wb = ffm_weights + index_b * index_stride + field_a * field_stride;
 
             __m256 xmm_val = _mm256_set1_ps(value_a * value_b / norm);
 
@@ -151,11 +150,11 @@ void ffm_model::update(const ffm_feature * start, const ffm_feature * end, ffm_f
         ffm_uint field_a = fa->index >> ffm_hash_bits;
         ffm_float value_a = fa->value;
 
-        ffm_float g = lambda * linear_weights[index_a*2] + kappa * value_a / linear_norm;
-        ffm_float wg = linear_weights[index_a*2 + 1] + g*g;
+        ffm_float g = lambda * lin_weights[index_a*2] + kappa * value_a / linear_norm;
+        ffm_float wg = lin_weights[index_a*2 + 1] + g*g;
 
-        linear_weights[index_a*2] -= eta * g / sqrt(wg);
-        linear_weights[index_a*2 + 1] = wg;
+        lin_weights[index_a*2] -= eta * g / sqrt(wg);
+        lin_weights[index_a*2 + 1] = wg;
 
         if (field_a < min_a_field)
             continue;
@@ -172,8 +171,8 @@ void ffm_model::update(const ffm_feature * start, const ffm_feature * end, ffm_f
                 ffm_uint index_p = fb[prefetch_depth].index &  ffm_hash_mask;
                 ffm_uint field_p = fb[prefetch_depth].index >> ffm_hash_bits;
 
-                prefetch_interaction_weights(weights + index_p * index_stride + field_a * field_stride);
-                prefetch_interaction_weights(weights + index_a * index_stride + field_p * field_stride);
+                prefetch_interaction_weights(ffm_weights + index_p * index_stride + field_a * field_stride);
+                prefetch_interaction_weights(ffm_weights + index_a * index_stride + field_p * field_stride);
             }
 
             if (test_mask_bit(mask, i) == 0)
@@ -182,8 +181,8 @@ void ffm_model::update(const ffm_feature * start, const ffm_feature * end, ffm_f
             //if (field_a == field_b)
             //    continue;
 
-            ffm_float * wa = weights + index_a * index_stride + field_b * field_stride;
-            ffm_float * wb = weights + index_b * index_stride + field_a * field_stride;
+            ffm_float * wa = ffm_weights + index_a * index_stride + field_b * field_stride;
+            ffm_float * wb = ffm_weights + index_b * index_stride + field_a * field_stride;
 
             ffm_float * wga = wa + n_dim_aligned;
             ffm_float * wgb = wb + n_dim_aligned;

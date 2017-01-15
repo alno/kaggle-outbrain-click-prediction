@@ -4,7 +4,6 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
-#include <random>
 #include <algorithm>
 
 
@@ -64,8 +63,8 @@ ftrl_model::ftrl_model(uint n_bits, float alpha, float beta, float l1, float l2)
     weights_z = malloc_aligned<float>(n_weights);
     weights_n = malloc_aligned<float>(n_weights);
 
-    zero_weights(weights_z, n_weights);
-    zero_weights(weights_n, n_weights);
+    fill_with_zero(weights_z, n_weights);
+    fill_with_zero(weights_n, n_weights);
 }
 
 ftrl_model::~ftrl_model() {
@@ -81,7 +80,7 @@ float ftrl_model::predict(const ffm_feature * start, const ffm_feature * end, ff
     feature_buf.clear();
     feature_buf.add(0, 1.0);
 
-    int i = 0;
+    //int i = 0;
     for (const ffm_feature * fa = start; fa != end; ++ fa) {
         feature_buf.add(fa->index & mask, fa->value);
 /*
