@@ -35,60 +35,81 @@ def fit_predict(profile, split, split_name):
 
 
 profiles = {
-    'p1': {
+    'ffm2-p1': {
         'epochs': 4,
         'seed': 2017,
         'dataset': "p1",
     },
 
-    'p1r': {
+    'ffm2-p1r': {
         'epochs': 4,
         'seed': 123,
         'options': "--restricted",
         'dataset': "p1",
     },
 
-    'p1b': {
+    'ffm2-p1b': {
         'epochs': 4,
         'bags': 3,
         'dataset': "p1",
     },
 
-    'f1': {
+    'ffm2-f1': {
         'epochs': 4,
         'seed': 42,
         'dataset': "f1",
     },
 
-    'f1b': {
+    'ffm2-f1b': {
         'bags': 2,
         'epochs': 5,
         'dataset': "f1",
     },
 
-    'f1r': {
+    'ffm2-f1r': {
         'epochs': 4,
         'seed': 71,
         'options': "--restricted",
         'dataset': "f1",
     },
 
-    'f2': {
+    'ffm2-f2': {
         'epochs': 4,
         'seed': 456,
         'dataset': "f2",
     },
 
-    'f2r': {
+    'ffm2-f2r': {
         'epochs': 4,
         'seed': 879,
         'options': "--restricted",
         'dataset': "f2",
     },
 
-    'f3b': {
+    'ffm2-f3b': {
         'bags': 2,
         'epochs': 7,
+        'dataset': "f3",
+    },
+
+    'nn-f3b': {
+        'bags': 2,
+        'epochs': 5,
+        'options': "--model nn --dropout-log 3",
+        'dataset': "f3",
+    },
+
+    'nn-p1': {
+        'bags': 2,
+        'epochs': 5,
+        'options': "--model nn --dropout-log 2",
+        'dataset': "p1",
+    },
+
+    'ffm2-nn-f3b': {
+        'bags': 2,
+        'epochs': 3,
+        'options': "--model ffm-nn --dropout-log 1",
         'dataset': "f3",
     },
 }
@@ -110,4 +131,4 @@ if not os.path.exists('cache/full_train_bin_%s.index' % profile['dataset']) or a
     os.system("bin/export-bin-data-%s" % profile['dataset'])
 
 
-train_model(fit_predict, 'ffm2-%s' % profile_name, profile, name=args.continue_train)
+train_model(fit_predict, profile_name, profile, name=args.continue_train)

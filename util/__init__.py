@@ -168,4 +168,5 @@ def train_model(fit_predict, model_name, profile, name=None):
         del pred, subm
 
         print "  File name: %s" % name
-        print "Done."
+
+    print "Done."

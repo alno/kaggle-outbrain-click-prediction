@@ -180,7 +180,7 @@ time_split_values = model.get_split_values('time').keys()
 min_time_value = min(time_split_values) - 1.0
 max_time_value = max(time_split_values) + 1.0
 
-time_values = np.linspace(min_time_value, max_time_value, 20)
+time_values = np.linspace(min_time_value, max_time_value, 200)
 
 gain_records = []
 fscore_records = []
@@ -192,8 +192,10 @@ for time_value in time_values:
     fscore_records.append({f: imps[f].expected_fscore for f in imps})
 
 
-df_gain = pd.DataFrame.from_records(gain_records, index=time_values)
+df_gain = pd.DataFrame.from_records(gain_records, index=map(int, time_values))
+df_gain.index.rename('time', inplace=True)
 df_gain.to_csv('xg.v10.gain.csv')
 
-df_fscore = pd.DataFrame.from_records(fscore_records, index=time_values)
-df_gain.to_csv('xg.v10.fscore.csv')
+df_fscore = pd.DataFrame.from_records(fscore_records, index=map(int, time_values))
+df_fscore.index.rename('time', inplace=True)
+df_fscore.to_csv('xg.v10.fscore.csv')

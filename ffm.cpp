@@ -343,7 +343,7 @@ public:
 
     uint dropout_prob_log;
 public:
-    program_options(int ac, char* av[]): desc("Allowed options"), model_name("ffm"), n_epochs(10), n_threads(4), n_models(1), seed(2017) {
+    program_options(int ac, char* av[]): desc("Allowed options"), model_name("ffm"), n_epochs(10), n_threads(4), n_models(1), seed(2017), dropout_prob_log(1) {
         using namespace boost::program_options;
 
         desc.add_options()
@@ -357,7 +357,7 @@ public:
             ("threads", value<uint>(&n_threads), "number of threads (default 4)")
             ("average", value<uint>(&n_models), "number of models to average (default 1)")
             ("seed", value<uint>(&seed), "random seed")
-            ("dropout-log", value<uint>(&dropout_prob_log), "dropout probability (binary log)")
+            ("dropout-log", value<uint>(&dropout_prob_log), "binary log of dropout probability (default 1)")
             ("restricted", "restrict feature interactions to (E+C) * (C+A)")
         ;
 

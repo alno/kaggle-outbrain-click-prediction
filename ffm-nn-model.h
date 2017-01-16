@@ -18,7 +18,7 @@ class ffm_nn_model {
 
     uint max_b_field, min_a_field;
 public:
-    ffm_nn_model(int seed, bool restricted, float eta = 0.2, float ffm_lambda = 0.00002, float nn_lambda = 0.00002);
+    ffm_nn_model(int seed, bool restricted, float eta = 0.1, float ffm_lambda = 0.00002, float nn_lambda = 0.00002);
     ~ffm_nn_model();
 
     ffm_float predict(const ffm_feature * start, const ffm_feature * end, float norm, uint64_t * dropout_mask, float dropout_mult);

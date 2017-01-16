@@ -17,6 +17,12 @@ from scipy.special import logit
 
 
 preds = [
+    #'20170114-2122-ffm2-f1b-0.68827',
+    #'20170114-0106-ffm2-f1b-0.68775',
+
+    #'20170113-1506-ffm2-f1-0.68447',
+    #'20170113-1213-ffm2-p1-0.68392',
+
     '20170110-0230-ffm2-f1-0.69220',
     '20170110-1055-ffm2-f1-2-0.69214',
 
@@ -200,7 +206,7 @@ name = gen_prediction_name('l2-%s' % model_name, score)
 test_p.loc[test_is_present, 'pred'] = present_model.predict(test_X[test_is_present])
 test_p.loc[test_is_future, 'pred'] = future_model.predict(test_X[test_is_future])
 
-test_p[['pred']].to_pickle('preds/%s-test.pickle' % name)
+test_p[['pred']].to_csv('preds/%s-test.csv.gz' % name, index=False, compression='gzip')
 
 del test_X, test_is_future, test_is_present
 
