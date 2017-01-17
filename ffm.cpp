@@ -21,7 +21,7 @@ const ffm_uint batch_size = 20000;
 const ffm_uint mini_batch_size = 24;
 
 // Dropout configuration
-const ffm_uint dropout_mask_max_size = 1000; // in 64-bit words
+const ffm_uint dropout_mask_max_size = 4000; // in 64-bit words
 
 
 std::default_random_engine rnd(2017);
@@ -68,7 +68,9 @@ void fill_mask_rand(uint64_t * mask, int size, int zero_prob_log) {
     for (int p = 0; p < size; ++ p) {
         for (int i = 0; i < zero_prob_log; ++ i) {
             long long unsigned int v;
-            _rdrand64_step(&v);
+            if (_rdrand64_step(&v) != 1)
+                throw std::runtime_error("Error generating random number!");
+
             mask[p] |= v;
         }
     }
@@ -342,8 +344,13 @@ public:
     bool restricted;
 
     uint dropout_prob_log;
+
+    float eta, lambda;
 public:
-    program_options(int ac, char* av[]): desc("Allowed options"), model_name("ffm"), n_epochs(10), n_threads(4), n_models(1), seed(2017), dropout_prob_log(1) {
+    program_options(int ac, char* av[]):
+        desc("Allowed options"), model_name("ffm"), n_epochs(10), n_threads(4), n_models(1), seed(2017),
+        dropout_prob_log(1), eta(0), lambda(0)
+    {
         using namespace boost::program_options;
 
         desc.add_options()
@@ -358,6 +365,8 @@ public:
             ("average", value<uint>(&n_models), "number of models to average (default 1)")
             ("seed", value<uint>(&seed), "random seed")
             ("dropout-log", value<uint>(&dropout_prob_log), "binary log of dropout probability (default 1)")
+            ("eta", value<float>(&eta), "learning rate")
+            ("lambda", value<float>(&lambda), "l2 regularization coeff")
             ("restricted", "restrict feature interactions to (E+C) * (C+A)")
         ;
 
@@ -418,17 +427,23 @@ int main(int ac, char* av[]) {
 
     // Run model
     if (opts.model_name == "ffm") {
+        float eta = opts.eta > 0 ? opts.eta : 0.2;
+        float lambda = opts.lambda > 0 ? opts.lambda : 0.00002;
+
         std::vector<ffm_model*> models;
 
         for (uint i = 0; i < opts.n_models; ++ i)
-            models.push_back(new ffm_model(opts.seed + 100 + i * 17, opts.restricted));
+            models.push_back(new ffm_model(opts.seed + 100 + i * 17, opts.restricted, eta, lambda));
 
         apply(models, opts);
     } else if (opts.model_name == "ffm-nn") {
+        float eta = opts.eta > 0 ? opts.eta : 0.05;
+        float lambda = opts.lambda > 0 ? opts.lambda : 0.00002;
+
         std::vector<ffm_nn_model*> models;
 
         for (uint i = 0; i < opts.n_models; ++ i)
-            models.push_back(new ffm_nn_model(opts.seed + 100 + i * 17, opts.restricted));
+            models.push_back(new ffm_nn_model(opts.seed + 100 + i * 17, opts.restricted, eta, lambda, 0.0001));
 
         apply(models, opts);
     } else if (opts.model_name == "ftrl") {
@@ -439,10 +454,13 @@ int main(int ac, char* av[]) {
 
         apply(models, opts);
     } else if (opts.model_name == "nn") {
+        float eta = opts.eta > 0 ? opts.eta : 0.02;
+        float lambda = opts.lambda > 0 ? opts.lambda : 0.00002;
+
         std::vector<nn_model*> models;
 
         for (uint i = 0; i < opts.n_models; ++ i)
-            models.push_back(new nn_model(opts.seed + 100 + i * 17));
+            models.push_back(new nn_model(opts.seed + 100 + i * 17, eta, lambda));
 
         apply(models, opts);
     } else {

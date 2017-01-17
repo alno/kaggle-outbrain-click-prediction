@@ -84,16 +84,22 @@ ffm_index ffm_read_index(const std::string & file_name) {
 // batch data reading
 
 std::vector<ffm_feature> ffm_read_batch(const std::string & file_name, ffm_ulong from, ffm_ulong to) {
+    std::vector<ffm_feature> features(to - from);
+    ffm_read_batch(file_name, from, to, features);
+    return features;
+};
+
+void ffm_read_batch(const std::string & file_name, ffm_ulong from, ffm_ulong to, std::vector<ffm_feature> & features) {
     using namespace std;
 
     if (to < from)
         throw runtime_error("Wrong range");
 
-    std::vector<ffm_feature> features(to - from);
+    features.resize(to - from);
 
     // Empty range, no need to read
     if (to == from)
-        return features;
+        return;
 
     FILE * file = fopen(file_name.c_str(), "rb");
 
@@ -107,8 +113,6 @@ std::vector<ffm_feature> ffm_read_batch(const std::string & file_name, ffm_ulong
         throw new runtime_error("Can't read data");
 
     fclose(file);
-
-    return features;
 }
 
 // stream data writing

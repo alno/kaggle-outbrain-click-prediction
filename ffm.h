@@ -38,6 +38,8 @@ void ffm_write_index(const std::string & file_name, const ffm_index & index);
 ffm_index ffm_read_index(const std::string & file_name);
 
 std::vector<ffm_feature> ffm_read_batch(const std::string & file_name, ffm_ulong from, ffm_ulong to);
+void ffm_read_batch(const std::string & file_name, ffm_ulong from, ffm_ulong to, std::vector<ffm_feature> & features);
+
 
 // Writes data files in sequential order
 class ffm_stream_data_writer {

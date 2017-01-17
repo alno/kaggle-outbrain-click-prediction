@@ -21,7 +21,7 @@ class nn_model {
     uint max_b_field;
     uint min_a_field;
 public:
-    nn_model(int seed, float eta = 0.1, float lambda = 0.00002);
+    nn_model(int seed, float eta, float lambda);
     ~nn_model();
 
     float predict(const ffm_feature * start, const ffm_feature * end, float norm, uint64_t * dropout_mask, float dropout_mult);

@@ -1,5 +1,7 @@
 #include "nn-model.h"
+
 #include "util/model-helpers.h"
+#include "util/nn-helpers.h"
 
 #include <iostream>
 #include <iomanip>
@@ -7,22 +9,27 @@
 #include <algorithm>
 
 
-constexpr ffm_ulong n_fields = 40;
-constexpr ffm_ulong n_features = 1 << ffm_hash_bits;
+constexpr uint n_features = 1 << ffm_hash_bits;
 
-constexpr uint l0_output_size = aligned_float_array_size(1 + n_fields);
+constexpr uint l0_output_size = aligned_float_array_size(96);
 constexpr uint l1_output_size = aligned_float_array_size(64);
-constexpr uint l2_output_size = aligned_float_array_size(64);
+constexpr uint l2_output_size = aligned_float_array_size(48);
 
 constexpr uint l1_layer_size = l0_output_size * (l1_output_size - 1);
 constexpr uint l2_layer_size = l1_output_size * (l2_output_size - 1);
 constexpr uint l3_layer_size = l2_output_size;
 
 
+uint rehash(uint feature_index) {
+    return feature_index &  ffm_hash_mask;
+}
+
+
 class state_buffer {
 public:
     float * l0_output;
     float * l0_output_grad;
+    float * l0_dropout_mask;
 
     float * l1_output;
     float * l1_output_grad;
@@ -31,10 +38,13 @@ public:
     float * l2_output;
     float * l2_output_grad;
     float * l2_dropout_mask;
+
+    std::default_random_engine gen;
 public:
     state_buffer() {
         l0_output = malloc_aligned<float>(l0_output_size);
         l0_output_grad = malloc_aligned<float>(l0_output_size);
+        l0_dropout_mask = malloc_aligned<float>(l0_output_size);
 
         l1_output = malloc_aligned<float>(l1_output_size);
         l1_output_grad = malloc_aligned<float>(l1_output_size);
@@ -48,6 +58,7 @@ public:
     ~state_buffer() {
         free(l0_output);
         free(l0_output_grad);
+        free(l0_dropout_mask);
 
         free(l1_output);
         free(l1_output_grad);
@@ -57,7 +68,6 @@ public:
         free(l2_output_grad);
         free(l2_dropout_mask);
     }
-
 };
 
 static thread_local state_buffer local_state_buffer;
@@ -69,8 +79,8 @@ nn_model::nn_model(int seed, float eta, float lambda) {
 
     std::default_random_engine rnd(seed);
 
-    lin_w = malloc_aligned<float>(n_features);
-    lin_wg = malloc_aligned<float>(n_features);
+    lin_w = malloc_aligned<float>(n_features * l0_output_size);
+    lin_wg = malloc_aligned<float>(n_features * l0_output_size);
 
     l1_w = malloc_aligned<float>(l1_layer_size);
     l1_wg = malloc_aligned<float>(l1_layer_size);
@@ -81,16 +91,16 @@ nn_model::nn_model(int seed, float eta, float lambda) {
     l3_w = malloc_aligned<float>(l3_layer_size);
     l3_wg = malloc_aligned<float>(l3_layer_size);
 
-    fill_with_rand(lin_w, n_features, std::uniform_real_distribution<float>(-1.0, 1.0), rnd);
-    fill_with_ones(lin_wg, n_features);
+    fill_with_rand(lin_w, n_features * l0_output_size, std::uniform_real_distribution<float>(-0.1, 0.1), rnd);
+    fill_with_ones(lin_wg, n_features * l0_output_size);
 
-    fill_with_rand(l1_w, l1_layer_size, std::uniform_real_distribution<float>(-1.0/l1_output_size, 1.0/l1_output_size), rnd);
+    fill_with_rand(l1_w, l1_layer_size, std::normal_distribution<float>(0, 2/sqrt(l0_output_size)), rnd);
     fill_with_ones(l1_wg, l1_layer_size);
 
-    fill_with_rand(l2_w, l2_layer_size, std::uniform_real_distribution<float>(-1.0, 1.0), rnd);
+    fill_with_rand(l2_w, l2_layer_size, std::normal_distribution<float>(0, 2/sqrt(l1_output_size)), rnd);
     fill_with_ones(l2_wg, l2_layer_size);
 
-    fill_with_rand(l3_w, l3_layer_size, std::uniform_real_distribution<float>(-1.0, 1.0), rnd);
+    fill_with_rand(l3_w, l3_layer_size, std::normal_distribution<float>(0, 2/sqrt(l2_output_size)), rnd);
     fill_with_ones(l3_wg, l3_layer_size);
 }
 
@@ -108,31 +118,53 @@ nn_model::~nn_model() {
 
 
 uint nn_model::get_dropout_mask_size(const ffm_feature * start, const ffm_feature * end) {
-    return l1_output_size + l2_output_size;
+    return 0;
 }
 
 
-float nn_model::predict(const ffm_feature * start, const ffm_feature * end, float norm, uint64_t * dropout_mask, float dropout_mult) {
+float nn_model::predict(const ffm_feature * start, const ffm_feature * end, float norm, uint64_t * _dropout_mask, float dropout_mult) {
     float linear_norm = end - start;
-    float * l0_output = local_state_buffer.l0_output;
+    state_buffer & buf = local_state_buffer;
 
-    float * l1_output = local_state_buffer.l1_output;
-    float * l1_dropout_mask = local_state_buffer.l1_dropout_mask;
+    float * l0_output = buf.l0_output;
+    float * l0_dropout_mask = buf.l0_dropout_mask;
 
-    float * l2_output = local_state_buffer.l2_output;
-    float * l2_dropout_mask = local_state_buffer.l2_dropout_mask;
+    float * l1_output = buf.l1_output;
+    float * l1_dropout_mask = buf.l1_dropout_mask;
 
-    uint dropout_idx = 0;
+    float * l2_output = buf.l2_output;
+    float * l2_dropout_mask = buf.l2_dropout_mask;
 
-    // Prepare dropout masks
+    auto & gen = buf.gen;
 
-    l1_dropout_mask[0] = 1.0; // No dropout on bias
-    for (uint j = 1; j < l1_output_size; ++ j)
-        l1_dropout_mask[j] = test_mask_bit(dropout_mask, dropout_idx ++);
+    std::uniform_real_distribution<float> dropout_distr(0, 1);
 
-    l2_dropout_mask[0] = 1.0; // No dropout on bias
-    for (uint j = 1; j < l2_output_size; ++ j)
-        l2_dropout_mask[j] = test_mask_bit(dropout_mask, dropout_idx ++);
+    if (dropout_mult > 1) { // Apply dropout only in train
+        float l0_dropout_prob = 0;//0.02;
+        float l1_dropout_prob = 0;//0.02;
+        float l2_dropout_prob = 0;//0.02;
+
+        float l0_dropout_scale = 1 / (1 - l0_dropout_prob);
+        float l1_dropout_scale = 1 / (1 - l1_dropout_prob);
+        float l2_dropout_scale = 1 / (1 - l2_dropout_prob);
+
+        // Prepare dropout masks
+        l0_dropout_mask[0] = 1.0; // No dropout on bias
+        for (uint j = 1; j < l0_output_size; ++ j)
+            l0_dropout_mask[j] = (dropout_distr(gen) >= l0_dropout_prob) * l0_dropout_scale;
+
+        l1_dropout_mask[0] = 1.0; // No dropout on bias
+        for (uint j = 1; j < l1_output_size; ++ j)
+            l1_dropout_mask[j] = (dropout_distr(gen) >= l1_dropout_prob) * l1_dropout_scale;
+
+        l2_dropout_mask[0] = 1.0; // No dropout on bias
+        for (uint j = 1; j < l2_output_size; ++ j)
+            l2_dropout_mask[j] = (dropout_distr(gen) >= l2_dropout_prob) * l2_dropout_scale;
+    } else {
+        fill_with_ones(l0_dropout_mask, l0_output_size);
+        fill_with_ones(l1_dropout_mask, l1_output_size);
+        fill_with_ones(l2_dropout_mask, l2_output_size);
+    }
 
     // Compute activations
 
@@ -140,135 +172,122 @@ float nn_model::predict(const ffm_feature * start, const ffm_feature * end, floa
     fill_with_zero(l1_output, l1_output_size);
     fill_with_zero(l2_output, l2_output_size);
 
-    l0_output[0] = 1.0; // Layer 0 bias
+    for (const ffm_feature * fa = start; fa != end; ++ fa) {
+        uint index = rehash(fa->index);
+        float value = fa->value;
+
+        float * wl = lin_w + index * l0_output_size;
+
+        __m256 ymm_val = _mm256_set1_ps(value / linear_norm);
+        for(ffm_uint d = 0; d < l0_output_size; d += 8) {
+            _mm256_store_ps(l0_output + d,  _mm256_load_ps(l0_output + d) + _mm256_load_ps(wl + d) * ymm_val);
+        }
+    }
+
+    l0_output[0] = 1.0; // Layer 0 bias, here we rewritre some computation results, but who cares
     l1_output[0] = 1.0; // Layer 1 bias
     l2_output[0] = 1.0; // Layer 2 bias
 
-    for (const ffm_feature * fa = start; fa != end; ++ fa) {
-        uint index_a = fa->index &  ffm_hash_mask;
-        uint field_a = fa->index >> ffm_hash_bits;
-        float value_a = fa->value;
-
-        l0_output[1 + field_a] += lin_w[index_a] * value_a / linear_norm;
-    }
+    // Layer 0 relu
+    for (uint j = 1; j < l0_output_size; ++ j)
+        l0_output[j] = relu(l0_output[j]) * l0_dropout_mask[j];
 
     // Layer 1 forward pass
-    for (uint j = 1; j < l1_output_size; ++ j) {
-        __m256 ymm_total = _mm256_set1_ps(0);
-
-        for (uint i = 0; i < l0_output_size; i += 8) {
-            ymm_total += _mm256_load_ps(l0_output + i) * _mm256_load_ps(l1_w + (j - 1) * l0_output_size + i);
-        }
-
-        l1_output[j] = relu(sum(ymm_total)) * l1_dropout_mask[j] * dropout_mult;
-    }
+    for (uint j = 1; j < l1_output_size; ++ j)
+        l1_output[j] = relu(forward_pass(l0_output_size, l0_output, l1_w + (j - 1) * l0_output_size)) * l1_dropout_mask[j];
 
     // Layer 2 forward pass
-    for (uint j = 1; j < l2_output_size; ++ j) {
-        __m256 ymm_total = _mm256_set1_ps(0);
-
-        for (uint i = 0; i < l1_output_size; i += 8) {
-            ymm_total += _mm256_load_ps(l1_output + i) * _mm256_load_ps(l2_w + (j - 1) * l1_output_size + i);
-        }
-
-        float l2_out = relu(sum(ymm_total)) * l2_dropout_mask[j] * dropout_mult;
-
-        l2_output[j] = l2_out;
-    }
+    for (uint j = 1; j < l2_output_size; ++ j)
+        l2_output[j] = relu(forward_pass(l1_output_size, l1_output, l2_w + (j - 1) * l1_output_size)) * l2_dropout_mask[j];
 
     // Layer 3 forward pass
-    float total = 0;
-    for (uint i = 0; i < l2_output_size; ++ i)
-        total += l2_output[i] * l3_w[i];
-
-    return total;
+    return forward_pass(l2_output_size, l2_output, l3_w);
 }
 
-void nn_model::update(const ffm_feature * start, const ffm_feature * end, float norm, float kappa, uint64_t * dropout_mask, float dropout_mult) {
+
+void nn_model::update(const ffm_feature * start, const ffm_feature * end, float norm, float kappa, uint64_t * _dropout_mask, float _dropout_mult) {
     float linear_norm = end - start;
+    state_buffer & buf = local_state_buffer;
 
-    float * l0_output = local_state_buffer.l0_output;
-    float * l0_output_grad = local_state_buffer.l0_output_grad;
+    float * l0_output = buf.l0_output;
+    float * l0_output_grad = buf.l0_output_grad;
+    float * l0_dropout_mask = buf.l0_dropout_mask;
 
-    float * l1_output = local_state_buffer.l1_output;
-    float * l1_output_grad = local_state_buffer.l1_output_grad;
-    float * l1_dropout_mask = local_state_buffer.l1_dropout_mask;
+    float * l1_output = buf.l1_output;
+    float * l1_output_grad = buf.l1_output_grad;
+    float * l1_dropout_mask = buf.l1_dropout_mask;
 
-    float * l2_output = local_state_buffer.l2_output;
-    float * l2_output_grad = local_state_buffer.l2_output_grad;
-    float * l2_dropout_mask = local_state_buffer.l2_dropout_mask;
+    float * l2_output = buf.l2_output;
+    float * l2_output_grad = buf.l2_output_grad;
+    float * l2_dropout_mask = buf.l2_dropout_mask;
 
     fill_with_zero(l0_output_grad, l0_output_size);
     fill_with_zero(l1_output_grad, l1_output_size);
     fill_with_zero(l2_output_grad, l2_output_size);
 
-    __m256 ymm_eta = _mm256_set1_ps(eta);
-    __m256 ymm_lambda = _mm256_set1_ps(lambda);
-    __m256 ymm_grad = _mm256_set1_ps(kappa);
+    backward_pass(l2_output_size, l2_output, l2_output_grad, l3_w, l3_wg, kappa, eta, lambda);
 
-    // Backprop layer 3
-    for (uint i = 0; i < l2_output_size; i += 8) {
-        __m256 ymm_w = _mm256_load_ps(l3_w + i);
-        __m256 ymm_dm = _mm256_load_ps(l2_dropout_mask + i);
+    // Backprop layer 2
+    for (uint j = 1, ofs = 0; j < l2_output_size; ++ j, ofs += l1_output_size) {
+        float l2_grad = l2_output_grad[j] * l2_dropout_mask[j];
 
-        __m256 ymm_g = (ymm_lambda * ymm_w + ymm_grad * _mm256_load_ps(l2_output + i)) * ymm_dm; // No gradient for dropped neuron
-        __m256 ymm_wg = _mm256_load_ps(l3_wg + i) + ymm_g * ymm_g;
+        if (l2_output[j] <= 0) // Relu activation: grad in negative part is zero
+            l2_grad = 0;
 
-        _mm256_store_ps(l2_output_grad + i, ymm_grad * ymm_w);
-
-        _mm256_store_ps(l3_w + i, ymm_w - ymm_eta * ymm_g * _mm256_rsqrt_ps(ymm_wg));
-        _mm256_store_ps(l3_wg + i, ymm_wg);
+        backward_pass(l1_output_size, l1_output, l1_output_grad, l2_w + ofs, l2_wg + ofs, l2_grad, eta, lambda);
     }
 
     // Backprop layer 1
-    for (uint j = 1; j < l2_output_size; ++ j) {
-        __m256 ymm_l2_grad = _mm256_set1_ps(l2_output_grad[j]);
+    for (uint j = 1, ofs = 0; j < l1_output_size; ++ j, ofs += l0_output_size) {
+        float l1_grad = l1_output_grad[j] * l1_dropout_mask[j];
 
-        for (uint i = 0; i < l1_output_size; i += 8) {
-            uint ofs = (j - 1) * l1_output_size + i;
+        if (l1_output[j] <= 0) // Relu activation: grad in negative part is zero
+            l1_grad = 0;
 
-            __m256 ymm_w = _mm256_load_ps(l2_w + ofs);
-            __m256 ymm_dm = _mm256_load_ps(l1_dropout_mask + i);
-
-            __m256 ymm_g = (ymm_lambda * ymm_w + ymm_l2_grad * _mm256_load_ps(l1_output + i)) * ymm_dm; // No gradient for dropped neuron
-            __m256 ymm_wg = _mm256_load_ps(l2_wg + ofs) + ymm_g * ymm_g;
-
-            _mm256_store_ps(l1_output_grad + i, ymm_l2_grad * ymm_w + _mm256_load_ps(l1_output_grad + i));
-
-            _mm256_store_ps(l2_w + ofs, ymm_w - ymm_eta * ymm_g * _mm256_rsqrt_ps(ymm_wg));
-            _mm256_store_ps(l2_wg + ofs, ymm_wg);
-        }
+        backward_pass(l0_output_size, l0_output, l0_output_grad, l1_w + ofs, l1_wg + ofs, l1_grad, eta, lambda);
     }
 
-    // Backprop layer 1
-    for (uint j = 1; j < l1_output_size; ++ j) {
-        __m256 ymm_l1_grad = _mm256_set1_ps(l1_output_grad[j]);
+    // Backprop layer 0
+    l0_output_grad[0] = 0;
+    for (uint j = 1; j < l0_output_size; ++ j) {
+        float l0_grad = l0_output_grad[j] * l0_dropout_mask[j];
 
-        for (uint i = 0; i < l0_output_size; i += 8) {
-            uint ofs = (j - 1) * l0_output_size + i;
+        if (l0_output[j] <= 0) // Relu activation: grad in negative part is zero
+            l0_grad = 0;
 
-            __m256 ymm_w = _mm256_load_ps(l1_w + ofs);
-
-            __m256 ymm_g = ymm_lambda * ymm_w + ymm_l1_grad * _mm256_load_ps(l0_output + i);
-            __m256 ymm_wg = _mm256_load_ps(l1_wg + ofs) + ymm_g * ymm_g;
-
-            _mm256_store_ps(l0_output_grad + i, ymm_l1_grad * ymm_w + _mm256_load_ps(l0_output_grad + i));
-
-            _mm256_store_ps(l1_w + ofs, ymm_w - ymm_eta * ymm_g * _mm256_rsqrt_ps(ymm_wg));
-            _mm256_store_ps(l1_wg + ofs, ymm_wg);
-        }
+        l0_output_grad[j] = l0_grad;
     }
 
     // Update linear and interaction weights
+    __m256 ymm_eta = _mm256_set1_ps(eta);
+    __m256 ymm_lambda = _mm256_set1_ps(lambda);
+
     for (const ffm_feature * fa = start; fa != end; ++ fa) {
-        uint index_a = fa->index &  ffm_hash_mask;
-        uint field_a = fa->index >> ffm_hash_bits;
-        float value_a = fa->value;
+        uint index = rehash(fa->index);
+        float value = fa->value;
 
-        float g = lambda * lin_w[index_a] + l0_output_grad[1 + field_a] * value_a / linear_norm;
-        float wg = lin_wg[index_a] + g*g;
+        float * wl = lin_w + index * l0_output_size;
+        float * wgl = lin_wg + index * l0_output_size;
 
-        lin_w[index_a] -= eta * g / sqrt(wg);
-        lin_wg[index_a] = wg;
+        __m256 ymm_val = _mm256_set1_ps(value / linear_norm);
+
+        for (uint d = 0; d < l0_output_size; d += 8) {
+            __m256 ymm_kappa_val = _mm256_load_ps(l0_output_grad + d) * ymm_val;
+
+            // Load weights
+            __m256 ymm_wl = _mm256_load_ps(wl + d);
+            __m256 ymm_wgl = _mm256_load_ps(wgl + d);
+
+            // Compute gradient values
+            __m256 ymm_g  = ymm_lambda * ymm_wl + ymm_kappa_val;
+
+            // Update weights
+            ymm_wgl = ymm_wgl + ymm_g * ymm_g;
+            ymm_wl  = ymm_wl - ymm_eta * ymm_g * _mm256_rsqrt_ps(ymm_wgl);
+
+            // Store weights
+            _mm256_store_ps(wl + d, ymm_wl);
+            _mm256_store_ps(wgl + d, ymm_wgl);
+        }
     }
 }
