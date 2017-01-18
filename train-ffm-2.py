@@ -92,11 +92,36 @@ profiles = {
         'dataset': "f3",
     },
 
+    'ffm2-f4b': {
+        'bags': 2,
+        'epochs': 7,
+        'dataset': "f4",
+    },
+
+    'ffm2-f5b': {
+        'bags': 2,
+        'epochs': 7,
+        'dataset': "f5",
+    },
+
     'nn-f3b': {
         'bags': 2,
-        'epochs': 5,
-        'options': "--model nn --dropout-log 3",
+        'epochs': 3,
+        'options': "--model nn --lambda 0.00001",
         'dataset': "f3",
+    },
+
+    'nn-f4': {
+        'epochs': 4,
+        'options': "--model nn --lambda 0.0001",
+        'dataset': "f4",
+    },
+
+    'ffm-nn-f4b': {
+        'bags': 2,
+        'epochs': 4,
+        'options': "--model ffm-nn --lambda 0.00001",
+        'dataset': "f4",
     },
 
     'nn-p1': {
