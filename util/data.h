@@ -181,7 +181,7 @@ struct reference_data {
     std::unordered_map<uint, std::vector<uint>> doc_ad_others;
     std::unordered_map<uint, std::vector<uint>> viewed_doc_trf_source;
     std::unordered_map<uint, std::vector<uint>> viewed_doc_sources;
-    //std::unordered_map<uint, std::vector<uint>> viewed_doc_topics;
+    std::unordered_map<uint, std::vector<uint>> viewed_doc_topics;
 
     std::unordered_map<uint, traffic_source_id_list> viewed_trfsrc_doc_sources;
     std::unordered_map<uint, traffic_source_id_list> viewed_trfsrc_docs;
@@ -205,7 +205,7 @@ reference_data load_reference_data() {
     res.doc_ad_others = read_map("cache/doc_ad_others.csv.gz", read_uid_indexed_id_list);
     res.viewed_doc_trf_source = read_map("cache/viewed_doc_trf_source.csv.gz", read_uid_indexed_id_list);
     res.viewed_doc_sources = read_map("cache/viewed_doc_sources.csv.gz", read_uid_indexed_id_list);
-    //res.viewed_doc_topics = read_map("cache/viewed_doc_topics.csv.gz", read_uid_indexed_id_list);
+    res.viewed_doc_topics = read_map("cache/viewed_doc_topics.csv.gz", read_uid_indexed_id_list);
 
 
     return res;
