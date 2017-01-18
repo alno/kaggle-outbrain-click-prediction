@@ -2,6 +2,9 @@
 #include "util/data.h"
 
 
+#include <queue>
+
+
 std::vector<std::pair<std::string, std::string>> filesets {
     { "cache/clicks_cv1_train.csv.gz", "cv1_train" },
     { "cache/clicks_cv1_test.csv.gz", "cv1_test" },
@@ -68,7 +71,7 @@ public:
         return "grp_past_views,grp_past_clicks,grp_past_all_views,grp_future_views,grp_future_clicks,grp_future_all_views";
     }
 
-    void write(std::ostream & out, int group_id, int ad_id) {
+    void write(std::ostream & out, int group_id, int display_id, int ad_id) {
         using namespace std;
 
         auto & cnt = grp_counts[group_id];
@@ -81,7 +84,7 @@ public:
             << int(cnt.future_all) << endl;
     }
 
-    void update_past(int group_id, int ad_id, int clicked) {
+    void update_past(int group_id, int display_id, int ad_id, int clicked) {
         auto & cnt = grp_counts[group_id];
 
         if (cnt.past_all == std::numeric_limits<C>::max())
@@ -96,7 +99,7 @@ public:
             ++ cnt.past_pos;
     }
 
-    void update_future(int group_id, int ad_id, int clicked, int sign) {
+    void update_future(int group_id, int display_id, int ad_id, int clicked, int sign) {
         auto & cnt = grp_counts[group_id];
 
         if (sign > 0 && cnt.future_all == std::numeric_limits<C>::max())
@@ -124,7 +127,7 @@ public:
         return "ad_past_views,ad_past_clicks,ad_past_all_views,ad_doc_past_views,ad_doc_past_clicks,ad_doc_past_all_views,ad_future_views,ad_future_clicks,ad_future_all_views,ad_doc_future_views,ad_doc_future_clicks,ad_doc_future_all_views";
     }
 
-    void write(std::ostream & out, int group_id, int ad_id) {
+    void write(std::ostream & out, int group_id, int display_id, int ad_id) {
         using namespace std;
 
         auto doc_id = ads[ad_id].document_id;
@@ -146,7 +149,7 @@ public:
             << int(ad_doc_cnt.future_all) << endl;
     }
 
-    void update_past(int group_id, int ad_id, int clicked) {
+    void update_past(int group_id, int display_id, int ad_id, int clicked) {
         using namespace std;
 
         auto doc_id = ads[ad_id].document_id;
@@ -171,7 +174,7 @@ public:
         }
     }
 
-    void update_future(int group_id, int ad_id, int clicked, int sign) {
+    void update_future(int group_id, int display_id, int ad_id, int clicked, int sign) {
         using namespace std;
 
         auto doc_id = ads[ad_id].document_id;
@@ -209,7 +212,7 @@ public:
         return "pub_past_views,pub_past_clicks,pub_past_all_views,src_past_views,src_past_clicks,src_past_all_views,pub_future_views,pub_future_clicks,pub_future_all_views,src_future_views,src_future_clicks,src_future_all_views";
     }
 
-    void write(std::ostream & out, int group_id, int ad_id) {
+    void write(std::ostream & out, int group_id, int display_id, int ad_id) {
         using namespace std;
 
         auto doc_id = ads[ad_id].document_id;
@@ -232,7 +235,7 @@ public:
             << int(ad_src_cnt.future_all) << endl;
     }
 
-    void update_past(int group_id, int ad_id, int clicked) {
+    void update_past(int group_id, int display_id, int ad_id, int clicked) {
         using namespace std;
 
         auto doc_id = ads[ad_id].document_id;
@@ -258,7 +261,7 @@ public:
         }
     }
 
-    void update_future(int group_id, int ad_id, int clicked, int sign) {
+    void update_future(int group_id, int display_id, int ad_id, int clicked, int sign) {
         using namespace std;
 
         auto doc_id = ads[ad_id].document_id;
@@ -296,7 +299,7 @@ public:
         return "cmp_past_views,cmp_past_clicks,cmp_past_all_views,adv_past_views,adv_past_clicks,adv_past_all_views,cmp_future_views,cmp_future_clicks,cmp_future_all_views,adv_future_views,adv_future_clicks,adv_future_all_views";
     }
 
-    void write(std::ostream & out, int group_id, int ad_id) {
+    void write(std::ostream & out, int group_id, int display_id, int ad_id) {
         using namespace std;
 
         auto ad = ads[ad_id];
@@ -318,7 +321,7 @@ public:
             << int(ad_adv_cnt.future_all) << endl;
     }
 
-    void update_past(int group_id, int ad_id, int clicked) {
+    void update_past(int group_id, int display_id, int ad_id, int clicked) {
         using namespace std;
 
         auto ad = ads[ad_id];
@@ -343,7 +346,7 @@ public:
         }
     }
 
-    void update_future(int group_id, int ad_id, int clicked, int sign) {
+    void update_future(int group_id, int display_id, int ad_id, int clicked, int sign) {
         using namespace std;
 
         auto ad = ads[ad_id];
@@ -378,7 +381,7 @@ public:
         return "cat_past_views,cat_past_clicks,cat_past_all_views,cat_future_views,cat_future_clicks,cat_future_all_views";
     }
 
-    void write(std::ostream & out, int group_id, int ad_id) {
+    void write(std::ostream & out, int group_id, int display_id, int ad_id) {
         using namespace std;
 
         auto doc_id = ads[ad_id].document_id;
@@ -412,7 +415,7 @@ public:
             << cat_future_all_views << endl;
     }
 
-    void update_past(int group_id, int ad_id, int clicked) {
+    void update_past(int group_id, int display_id, int ad_id, int clicked) {
         using namespace std;
 
         auto doc_id = ads[ad_id].document_id;
@@ -431,7 +434,7 @@ public:
         }
     }
 
-    void update_future(int group_id, int ad_id, int clicked, int sign) {
+    void update_future(int group_id, int display_id, int ad_id, int clicked, int sign) {
         using namespace std;
 
         auto doc_id = ads[ad_id].document_id;
@@ -458,7 +461,7 @@ public:
         return "top_past_views,top_past_clicks,top_past_all_views,top_future_views,top_future_clicks,top_future_all_views";
     }
 
-    void write(std::ostream & out, int group_id, int ad_id) {
+    void write(std::ostream & out, int group_id, int display_id, int ad_id) {
         using namespace std;
 
         auto doc_id = ads[ad_id].document_id;
@@ -492,7 +495,7 @@ public:
             << top_future_all_views << endl;
     }
 
-    void update_past(int group_id, int ad_id, int clicked) {
+    void update_past(int group_id, int display_id, int ad_id, int clicked) {
         using namespace std;
 
         auto doc_id = ads[ad_id].document_id;
@@ -511,7 +514,7 @@ public:
         }
     }
 
-    void update_future(int group_id, int ad_id, int clicked, int sign) {
+    void update_future(int group_id, int display_id, int ad_id, int clicked, int sign) {
         using namespace std;
 
         auto doc_id = ads[ad_id].document_id;
@@ -540,7 +543,7 @@ public:
         return "ad_doc_bag_past,ad_doc_bag_past_clicked,ad_doc_bag_future,ad_doc_bag_future_clicked";
     }
 
-    void write(std::ostream & out, int group_id, int ad_id) {
+    void write(std::ostream & out, int group_id, int display_id, int ad_id) {
         using namespace std;
 
         auto & grp_map = ad_counts[group_id];
@@ -583,7 +586,7 @@ public:
         out << past_str << "," << past_clicked_str << "," << future_str << "," << future_clicked_str << endl;
     }
 
-    void update_past(int group_id, int ad_id, int clicked) {
+    void update_past(int group_id, int display_id, int ad_id, int clicked) {
         using namespace std;
 
         auto & ad_cnt = ad_counts[group_id][ads[ad_id].document_id];
@@ -598,7 +601,7 @@ public:
         }
     }
 
-    void update_future(int group_id, int ad_id, int clicked, int sign) {
+    void update_future(int group_id, int display_id, int ad_id, int clicked, int sign) {
         using namespace std;
 
         auto & ad_cnt = ad_counts[group_id][ads[ad_id].document_id];
@@ -616,11 +619,85 @@ public:
     }
 };
 
+
+class viewed_ad_leak_writer {
+    std::unordered_map<std::pair<int,int>, uint16_t> future_display_id_doc_counts;
+public:
+    std::string get_header() {
+        return "ad_doc_in_future_display_id_docs";
+    }
+
+    void write(std::ostream & out, int group_id, int display_id, int ad_id) {
+        using namespace std;
+
+        uint doc_cnt = 0;
+        auto doc_cnt_it = future_display_id_doc_counts.find(make_pair(group_id, ads[ad_id].document_id));
+        if (doc_cnt_it != future_display_id_doc_counts.end())
+            doc_cnt = doc_cnt_it->second;
+
+        out << uint(doc_cnt > 0) << endl;
+    }
+
+    void update_past(int group_id, int display_id, int ad_id, int clicked) {
+
+    }
+
+    void update_future(int group_id, int display_id, int ad_id, int clicked, int sign) {
+        using namespace std;
+
+        auto & display_id_doc_cnt = future_display_id_doc_counts[make_pair(group_id, events[display_id].document_id)];
+
+        if (sign > 0 && display_id_doc_cnt == numeric_limits<uint16_t>::max())
+            throw std::logic_error("Positive overflow");
+        else if (sign < 0 && display_id_doc_cnt == numeric_limits<uint16_t>::min())
+            throw std::logic_error("Negative overflow");
+
+        display_id_doc_cnt += sign;
+    }
+};
+
+class viewed_ad_leak_2_writer {
+    std::unordered_map<int, std::queue<uint32_t>> future_display_doc_queues;
+public:
+    std::string get_header() {
+        return "ad_doc_is_next_display_doc";
+    }
+
+    void write(std::ostream & out, int group_id, int display_id, int ad_id) {
+        using namespace std;
+
+        uint doc_id = ads[ad_id].document_id;
+        auto & q = future_display_doc_queues[group_id];
+
+        bool found = q.size() > 0 && q.front() == doc_id;
+
+        out << uint(found) << endl;
+    }
+
+    void update_past(int group_id, int display_id, int ad_id, int clicked) {
+
+    }
+
+    void update_future(int group_id, int display_id, int ad_id, int clicked, int sign) {
+        using namespace std;
+
+        uint doc_id = events[display_id].document_id;
+        auto & q = future_display_doc_queues[group_id];
+
+        if (sign > 0)
+            q.push(doc_id);
+        else if (sign < 0)
+            q.pop();
+    }
+};
+
+
 //////////////////////
 
 
 struct row {
     int group_id;
+    int display_id;
     int ad_id;
     int clicked;
 };
@@ -629,13 +706,13 @@ struct row {
 template <typename W>
 void process_group(W & w, const std::vector<row> & group, std::ostream & out) {
     for (auto it = group.begin(); it != group.end(); ++ it)
-        w.update_future(it->group_id, it->ad_id, it->clicked, -1);
+        w.update_future(it->group_id, it->display_id, it->ad_id, it->clicked, -1);
 
     for (auto it = group.begin(); it != group.end(); ++ it)
-        w.write(out, it->group_id, it->ad_id);
+        w.write(out, it->group_id, it->display_id, it->ad_id);
 
     for (auto it = group.begin(); it != group.end(); ++ it)
-        w.update_past(it->group_id, it->ad_id, it->clicked);
+        w.update_past(it->group_id, it->display_id, it->ad_id, it->clicked);
 }
 
 
@@ -657,7 +734,9 @@ void fill_future(int group_extractor(const event & e), W & w, const std::string 
         if (row.empty())
             break;
 
-        w.update_future(group_extractor(events[stoi(row[0])]), stoi(row[1]), known ? stoi(row[2]) : -1, 1);
+        uint display_id = stoi(row[0]);
+        uint ad_id = stoi(row[1]);
+        w.update_future(group_extractor(events[display_id]), display_id, ad_id, known ? stoi(row[2]) : -1, 1);
 
         ++ i;
 
@@ -721,6 +800,7 @@ void generate(int group_extractor(const event & e), const std::string & features
             int event_id = stoi(a_row[0]);
 
             row r;
+            r.display_id = event_id;
             r.ad_id = stoi(a_row[1]);
             r.group_id = group_extractor(events[event_id]);
             r.clicked = stoi(a_row[2]);
@@ -740,6 +820,7 @@ void generate(int group_extractor(const event & e), const std::string & features
             int event_id = stoi(b_row[0]);
 
             row r;
+            r.display_id = event_id;
             r.ad_id = stoi(b_row[1]);
             r.group_id = group_extractor(events[event_id]);
             r.clicked = -1;
@@ -829,6 +910,9 @@ int main() {
     generate_all<topic_writer>(g2_extractor, "g2_viewed_ad_tops");
 
     generate_all<ad_doc_bag_writer<uint8_t>>(uid_extractor, "uid_viewed_ad_bags");
+
+    generate_all<viewed_ad_leak_writer>(uid_extractor, "uid_viewed_ad_leak");
+    generate_all<viewed_ad_leak_2_writer>(uid_extractor, "uid_viewed_ad_leak_2");
 
     cout << "Done." << endl;
 }
