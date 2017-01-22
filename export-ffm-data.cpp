@@ -6,8 +6,10 @@
 #include <cmath>
 
 std::vector<std::pair<std::vector<std::string>, std::string>> filesets = {
-    { { "cache/clicks_val_train.csv.gz", "cache/leak_val_train.csv.gz" }, "cache/val_train_ffm.txt" },
-    { { "cache/clicks_val_test.csv.gz", "cache/leak_val_test.csv.gz" }, "cache/val_test_ffm.txt" },
+    { { "cache/clicks_cv2_train.csv.gz", "cache/leak_cv2_train.csv.gz" }, "cache/cv2_train_ffm.txt" },
+    { { "cache/clicks_cv2_test.csv.gz", "cache/leak_cv2_test.csv.gz" }, "cache/cv2_test_ffm.txt" },
+    { { "cache/clicks_cv1_train.csv.gz", "cache/leak_val_train.csv.gz" }, "cache/cv1_train_ffm.txt" },
+    { { "cache/clicks_cv1_test.csv.gz", "cache/leak_val_test.csv.gz" }, "cache/cv1_test_ffm.txt" },
     { { "../input/clicks_train.csv.gz", "cache/leak_full_train.csv.gz" }, "cache/full_train_ffm.txt" },
     { { "../input/clicks_test.csv.gz", "cache/leak_full_test.csv.gz" }, "cache/full_test_ffm.txt" },
 };
