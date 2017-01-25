@@ -896,23 +896,11 @@ int main() {
 
     // Generating
 
-    generate_all<group_writer<uint16_t>>(uid_extractor, "uid_viewed_grps");
     generate_all<ad_writer<uint8_t>>(uid_extractor, "uid_viewed_ads");
     generate_all<source_writer<uint8_t>>(uid_extractor, "uid_viewed_ad_srcs");
     generate_all<campaign_writer<uint8_t>>(uid_extractor, "uid_viewed_ad_cmps");
     generate_all<category_writer>(uid_extractor, "uid_viewed_ad_cats");
     generate_all<topic_writer>(uid_extractor, "uid_viewed_ad_tops");
-
-    generate_all<ad_writer<uint32_t>>(g2_extractor, "g2_viewed_ads");
-    generate_all<source_writer<uint32_t>>(g2_extractor, "g2_viewed_ad_srcs");
-    generate_all<campaign_writer<uint32_t>>(g2_extractor, "g2_viewed_ad_cmps");
-    generate_all<category_writer>(g2_extractor, "g2_viewed_ad_cats");
-    generate_all<topic_writer>(g2_extractor, "g2_viewed_ad_tops");
-
-    generate_all<ad_doc_bag_writer<uint8_t>>(uid_extractor, "uid_viewed_ad_bags");
-
-    generate_all<viewed_ad_leak_writer>(uid_extractor, "uid_viewed_ad_leak");
-    generate_all<viewed_ad_leak_2_writer>(uid_extractor, "uid_viewed_ad_leak_2");
 
     cout << "Done." << endl;
 }

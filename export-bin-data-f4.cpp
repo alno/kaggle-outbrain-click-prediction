@@ -18,7 +18,7 @@ std::vector<std::string> features = {
     "leak",
     "viewed_docs", "viewed_categories", "viewed_topics",
     "uid_viewed_ads", "uid_viewed_ad_cmps", "uid_viewed_ad_srcs", "uid_viewed_ad_cats", "uid_viewed_ad_tops",
-    "rivals"//, "similarity"
+    "rivals"
 };
 
 std::string cur_dataset;

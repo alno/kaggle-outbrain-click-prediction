@@ -32,12 +32,6 @@ struct document {
 };
 
 
-struct traffic_source_id_list {
-    std::vector<uint> internal, social, search;
-};
-
-
-
 // Small util
 
 
@@ -49,7 +43,6 @@ namespace std {
         }
     };
 }
-
 
 
 // Functions to read data types
@@ -141,19 +134,6 @@ std::pair<uint, std::vector<uint>> read_uid_indexed_id_list(const std::vector<st
 }
 
 
-std::pair<uint, traffic_source_id_list> read_uid_indexed_trfsrc_id_list(const std::vector<std::string> & row) {
-    using namespace std;
-
-    traffic_source_id_list trf;
-    trf.internal = parse_id_list(row[1]);
-    trf.social = parse_id_list(row[2]);
-
-    if (row.size() > 3)
-        trf.search = parse_id_list(row[3]);
-
-    return make_pair(stoi(row[0]), move(trf));
-}
-
 std::vector<event> read_events() {
     return read_vector("cache/events.csv.gz", read_event, 23120127);
 }
@@ -176,20 +156,14 @@ struct reference_data {
     std::unordered_multimap<int, std::pair<int, float>> document_entities;
 
     std::unordered_map<std::pair<uint, uint>, std::vector<uint>> viewed_docs_one_hour_after;
-    //std::unordered_map<std::pair<uint, uint>, std::vector<uint>> viewed_docs_six_hours_after;
 
     std::unordered_map<uint, std::vector<uint>> doc_ad_others;
     std::unordered_map<uint, std::vector<uint>> viewed_doc_trf_source;
     std::unordered_map<uint, std::vector<uint>> viewed_doc_sources;
-
-    std::unordered_map<uint, traffic_source_id_list> viewed_trfsrc_doc_sources;
-    std::unordered_map<uint, traffic_source_id_list> viewed_trfsrc_docs;
 };
 
 reference_data load_reference_data() {
     reference_data res;
-    res.viewed_trfsrc_doc_sources = read_map("cache/viewed_trfsrc_doc_sources.csv.gz", read_uid_indexed_trfsrc_id_list);
-    res.viewed_trfsrc_docs = read_map("cache/viewed_trfsrc_docs.csv.gz", read_uid_indexed_trfsrc_id_list);
 
     res.events = read_events();
     res.ads = read_ads();
@@ -199,12 +173,10 @@ reference_data load_reference_data() {
     res.document_entities = read_multi_map("cache/documents_entities.csv.gz", read_document_annotation);
 
     res.viewed_docs_one_hour_after = read_map("cache/viewed_docs_one_hour_after.csv.gz", read_display_indexed_id_list);
-    //res.viewed_docs_six_hours_after = read_map("cache/viewed_docs_six_hours_after.csv.gz", read_display_indexed_id_list);
 
     res.doc_ad_others = read_map("cache/doc_ad_others.csv.gz", read_uid_indexed_id_list);
     res.viewed_doc_trf_source = read_map("cache/viewed_doc_trf_source.csv.gz", read_uid_indexed_id_list);
     res.viewed_doc_sources = read_map("cache/viewed_doc_sources.csv.gz", read_uid_indexed_id_list);
-
 
     return res;
 }
