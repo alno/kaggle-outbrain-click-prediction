@@ -61,6 +61,6 @@ fo.write('uuid,doc_trf_ids\n')
 for i in uuid_ev:
     if uuid_ev[i] != 1:
         tmp = list(uuid_ev[i])
-        fo.write('%s,%s\n' % (i, ' '.join(tmp)))
+        fo.write('%s,%s\n' % (uuid_uid[i], ' '.join(tmp)))
         del tmp
 fo.close()
