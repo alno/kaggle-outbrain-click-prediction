@@ -4,7 +4,7 @@
 # We use this feature by joining it back to the clicks_train and clicks_test files, so that
 # each row has information on the ads it it is competing against.
 # To run this script, execute the following command from the main folder :
-#         Rscript final/feat_disp_ad_doc_others.R
+#         Rscript prepare-doc-ad-others.R
 # """
 
 
