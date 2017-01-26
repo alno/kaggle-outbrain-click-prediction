@@ -153,7 +153,7 @@ def train_model(fit_predict, model_name, profile, name=None):
         del pred
 
     ## Prediction
-    if os.path.exists('preds/%s-cv1.csv.gz' % name):
+    if os.path.exists('preds/%s-test.csv.gz' % name):
         print "Full results already exist, skipping..."
     else:
         print "Full split..."
