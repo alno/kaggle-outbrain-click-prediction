@@ -16,10 +16,10 @@ done
 python prepare-events.py
 python prepare-documents.py
 
-Rscript feat_disp_ad_doc_others.R
-python feat_Uuid_Source_id.py
-python feat_Uuid_Doc_Srce_id.py
-python feat_Uuid_OneHour_Range.py
+Rscript prepare-doc-ad-others.R
+python prepare-viewed-doc-ids.py
+python prepare-viewed-doc-sources.py
+python prepare-viewed-docs-one-hour.py
 
 # Prepare positional feature files
 python prepare-split.py
