@@ -6,7 +6,7 @@ import os
 
 from numba import jit
 
-from .meta import cv1_split_time, full_split, cv1_split, cv2_split
+from .meta import cv1_split_time, full_split, cv1_split
 
 
 def gen_prediction_name(model_name, score):
