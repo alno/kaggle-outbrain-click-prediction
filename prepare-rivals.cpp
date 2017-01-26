@@ -3,8 +3,6 @@
 std::vector<std::pair<std::string, std::string>> filesets {
     { "cache/clicks_cv1_train.csv.gz", "cv1_train" },
     { "cache/clicks_cv1_test.csv.gz", "cv1_test" },
-    { "cache/clicks_cv2_train.csv.gz", "cv2_train" },
-    { "cache/clicks_cv2_test.csv.gz", "cv2_test" },
     { "../input/clicks_train.csv.gz", "full_train" },
     { "../input/clicks_test.csv.gz", "full_test" },
 };

@@ -109,31 +109,8 @@ def score_sorted(y_true, y_pred, y_group):
 
 def train_model(fit_predict, model_name, profile, name=None):
 
-    ## Validation on CV2
-    if name is not None and os.path.exists('preds/%s-cv2.csv.gz' % name):
-        print "CV2 results already exist, skipping..."
-    else:
-        print "CV2 split..."
-
-        pred = fit_predict(profile, cv2_split, 'cv2')
-
-        print "  Scoring..."
-
-        cv2_present_score, cv2_future_score, cv2_score = score_prediction(pred)
-
-        if name is None:
-            name = gen_prediction_name(model_name, cv2_score)
-
-        print "  Present score: %.5f" % cv2_present_score
-        print "  Future score: %.5f" % cv2_future_score
-        print "  Total score: %.5f" % cv2_score
-
-        pred[['pred']].to_csv('preds/%s-cv2.csv.gz' % name, index=False, compression='gzip')
-
-        del pred
-
     ## Validation on CV1
-    if os.path.exists('preds/%s-cv1.csv.gz' % name):
+    if name is not None and os.path.exists('preds/%s-cv1.csv.gz' % name):
         print "CV1 results already exist, skipping..."
     else:
         print "CV1 split..."
@@ -143,6 +120,9 @@ def train_model(fit_predict, model_name, profile, name=None):
         print "  Scoring..."
 
         cv1_present_score, cv1_future_score, cv1_score = score_prediction(pred)
+
+        if name is None:
+            name = gen_prediction_name(model_name, cv1_score)
 
         print "  Present score: %.5f" % cv1_present_score
         print "  Future score: %.5f" % cv1_future_score
