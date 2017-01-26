@@ -16,7 +16,7 @@ def fit_predict(profile, split, split_name):
     pred = None
     for i in xrange(n_bags):
         opts = profile.get('options', '')
-        opts += " --seed %d --epochs %d" % (profile.get('seed', np.random.randint(1e6)) + i * 3407, profile['epochs'])
+        opts += " --seed %d --epochs %d" % (profile['seed'] + i * 481467, profile['epochs'])
 
         if split_name != "full":
             opts += " --val %s" % pred_file
@@ -42,6 +42,7 @@ args = parser.parse_args()
 
 profile_name = 'ffm2-f4b'
 profile = {
+    'seed': 300171,
     'bags': 2,
     'epochs': 7,
     'dataset': "f4",
