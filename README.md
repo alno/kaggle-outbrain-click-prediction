@@ -1,6 +1,36 @@
 # Outbrain Click Prediction 2nd Place Solution (Single model)
 
 
+## Data location
+
+This code suppose what zipped competition data is located in `../input` directory.
+
+
+## Requirements
+
+This repository contains code in C++, Python and R. It requires:
+
+* Python - `pandas`, `sklearn`, `numba`
+* C++ - `boost`, `boost-iostreams`, `boost-program-options`
+* R - `data.table`, will be installed automatically
+
+We tested it in AWS `r4.xlarge` with Ubuntu 16.04 image, and following commands are enough to install all requirements:
+
+    sudo apt-get install python-pip llvm libboost-dev libboost-iostreams-dev libboost-program-options-dev g++ r-base
+
+    sudo pip install enum34
+    sudo pip install pandas sklearn numba
+
+
+## Execution
+
+After input data is located in `../input` and all requirements are installed, full pipeline with validation and submission file generation may be executed by calling `run.sh` script in current directory:
+
+    ./run.sh
+
+The submission file will be placed to `subm` subdir, raw predictions - to `preds` subdir.
+
+
 ## File structure
 
 
