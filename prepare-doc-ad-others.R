@@ -10,7 +10,7 @@
 
 cat("Set up packages")
 rm(list=ls())
-if (!require("data.table")) install.packages("data.table")
+if (!require("data.table")) install.packages("data.table", repos="http://cran.us.r-project.org")
 library(data.table)
 gc()
 
