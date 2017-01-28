@@ -34,7 +34,6 @@ echo "Preparing positions features..."
 python prepare-split.py
 bin/prepare-leak
 bin/prepare-rivals
-bin/prepare-similarity
 bin/prepare-viewed-ads
 bin/prepare-viewed-docs
 
