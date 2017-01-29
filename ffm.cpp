@@ -8,7 +8,6 @@
 #include <random>
 #include <algorithm>
 
-#include <immintrin.h>
 #include <omp.h>
 
 #include <boost/program_options.hpp>
@@ -21,7 +20,7 @@ const ffm_uint mini_batch_size = 24;
 const ffm_uint dropout_mask_max_size = 4000; // in 64-bit words
 
 
-std::default_random_engine rnd(2017);
+std::mt19937_64 rnd(2017);
 
 
 template <typename T>
@@ -59,18 +58,9 @@ std::vector<std::pair<ffm_ulong, ffm_ulong>> generate_mini_batches(ffm_ulong beg
 }
 
 
-void fill_mask_rand(uint64_t * mask, int size, int zero_prob_log) {
-    memset(mask, 0, size * sizeof(uint64_t));
-
-    for (int p = 0; p < size; ++ p) {
-        for (int i = 0; i < zero_prob_log; ++ i) {
-            long long unsigned int v;
-            if (_rdrand64_step(&v) != 1)
-                throw std::runtime_error("Error generating random number!");
-
-            mask[p] |= v;
-        }
-    }
+void fill_mask_rand(uint64_t * mask, int size) {
+    for (int p = 0; p < size; ++ p)
+        mask[p] = rnd();
 }
 
 void fill_mask_ones(uint64_t * mask, int size) {
@@ -128,8 +118,8 @@ ffm_double compute_map(const ffm_index & index, const std::vector<ffm_float> & p
 
 
 template <typename M>
-ffm_double train_on_dataset(const std::vector<M*> & models, const ffm_dataset & dataset, uint dropout_prob_log) {
-    float dropout_mult = (1 << dropout_prob_log) / ((1 << dropout_prob_log) - 1.0f);
+ffm_double train_on_dataset(const std::vector<M*> & models, const ffm_dataset & dataset) {
+    float dropout_mult = 2.0;
 
     time_t start_time = time(nullptr);
 
@@ -174,7 +164,7 @@ ffm_double train_on_dataset(const std::vector<M*> & models, const ffm_dataset & 
 
                     auto dropout_mask_size = models[mi]->get_dropout_mask_size(batch_features_data + start_offset, batch_features_data + end_offset);
 
-                    fill_mask_rand(dropout_mask, (dropout_mask_size + 63) / 64, dropout_prob_log);
+                    fill_mask_rand(dropout_mask, (dropout_mask_size + 63) / 64);
 
                     float t = models[mi]->predict(batch_features_data + start_offset, batch_features_data + end_offset, norm, dropout_mask, dropout_mult);
                     float expnyt = exp(-y*t);
@@ -361,7 +351,6 @@ public:
             ("threads", value<uint>(&n_threads), "number of threads (default 4)")
             ("average", value<uint>(&n_models), "number of models to average (default 1)")
             ("seed", value<uint>(&seed), "random seed")
-            ("dropout-log", value<uint>(&dropout_prob_log), "binary log of dropout probability (default 1)")
             ("eta", value<float>(&eta), "learning rate")
             ("lambda", value<float>(&lambda), "l2 regularization coeff")
             ("restricted", "restrict feature interactions to (E+C) * (C+A)")
@@ -392,7 +381,7 @@ void apply(const std::vector<M*> & models, program_options & opts) {
         for (ffm_uint epoch = 0; epoch < opts.n_epochs; ++ epoch) {
             cout << "Epoch " << epoch << "..." << endl;
 
-            train_on_dataset(models, ds_train, opts.dropout_prob_log);
+            train_on_dataset(models, ds_train);
         }
     } else { // Train with validation each epoch
         auto ds_train = open_dataset(opts.train_file_name);
@@ -401,7 +390,7 @@ void apply(const std::vector<M*> & models, program_options & opts) {
         for (ffm_uint epoch = 0; epoch < opts.n_epochs; ++ epoch) {
             cout << "Epoch " << epoch << "..." << endl;
 
-            train_on_dataset(models, ds_train, opts.dropout_prob_log);
+            train_on_dataset(models, ds_train);
             evaluate_on_dataset(models, ds_val);
         }
     }
